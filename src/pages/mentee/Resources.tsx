@@ -1,15 +1,28 @@
-import { resources } from "@/data/mockData";
-import { BookOpen, ExternalLink, FileText } from "lucide-react";
+import { useEffect, useState } from "react";
+import { menteeApi } from "@/lib/api";
+import { BookOpen, ExternalLink, FileText, Loader2 } from "lucide-react";
 
 export default function MenteeResources() {
+  const [resources, setResources] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    menteeApi.getResources()
+      .then(setResources)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /> Loading...</div>;
+
   return (
     <div className="space-y-6 max-w-3xl">
       <div>
         <h1 className="text-2xl font-bold font-display">Resources</h1>
         <p className="text-muted-foreground">Learning materials shared by mentors</p>
       </div>
-
       <div className="grid gap-4">
+        {resources.length === 0 && <p className="text-sm text-muted-foreground">No resources shared yet.</p>}
         {resources.map(res => (
           <div key={res.id} className="rounded-xl border bg-card p-6 transition-all duration-200 hover:shadow-md">
             <div className="flex items-start gap-3">
@@ -20,13 +33,15 @@ export default function MenteeResources() {
                 <h3 className="font-medium">{res.title}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{res.description}</p>
                 <div className="flex items-center gap-3 mt-2">
-                  <span className="text-xs text-muted-foreground">By {res.uploadedBy}</span>
-                  <span className="text-xs text-muted-foreground">{res.date}</span>
+                  <span className="text-xs text-muted-foreground">By {res.uploaded_by_name}</span>
+                  <span className="text-xs text-muted-foreground">{new Date(res.created_at).toLocaleDateString()}</span>
                 </div>
               </div>
-              <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
-                <ExternalLink className="h-4 w-4" />
-              </a>
+              {res.url && res.url !== '#' && (
+                <a href={res.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:text-primary/80 transition-colors">
+                  <ExternalLink className="h-4 w-4" />
+                </a>
+              )}
             </div>
           </div>
         ))}

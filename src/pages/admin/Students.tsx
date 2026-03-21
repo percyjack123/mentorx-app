@@ -1,14 +1,27 @@
-import { students } from "@/data/mockData";
+import { useEffect, useState } from "react";
+import { adminApi } from "@/lib/api";
 import { RiskBadge } from "@/components/StatusBadges";
+import { Loader2 } from "lucide-react";
 
 export default function Students() {
+  const [students, setStudents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    adminApi.getStudents()
+      .then(setStudents)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  if (loading) return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /> Loading...</div>;
+
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold font-display">Students</h1>
         <p className="text-muted-foreground">All registered students</p>
       </div>
-
       <div className="rounded-xl border bg-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -30,7 +43,7 @@ export default function Students() {
                   <td className="py-3 px-4">{s.semester}</td>
                   <td className="py-3 px-4">{s.cgpa}</td>
                   <td className="py-3 px-4">{s.attendance}%</td>
-                  <td className="py-3 px-4"><RiskBadge level={s.riskLevel} /></td>
+                  <td className="py-3 px-4"><RiskBadge level={s.risk_level} /></td>
                 </tr>
               ))}
             </tbody>

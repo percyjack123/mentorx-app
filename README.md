@@ -1,73 +1,143 @@
-# Welcome to your Lovable project
+# MentorX Backend — Setup Guide
 
-## Project info
-
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
-
-## How can I edit this code?
-
-There are several ways of editing your application.
-
-**Use Lovable**
-
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
-
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+## Project Structure
+```
+mentorx-backend/
+├── src/
+│   ├── index.js              # Express app entry point
+│   ├── db/index.js           # PostgreSQL (Supabase) connection
+│   ├── middleware/auth.js    # JWT auth middleware
+│   └── routes/
+│       ├── auth.js           # Login, /me
+│       ├── admin.js          # Admin-only routes
+│       ├── mentor.js         # Mentor routes
+│       └── mentee.js         # Mentee (student) routes
+├── schema.sql                # Run in Supabase SQL Editor
+├── seed.js                   # Seed 40 students + 4 mentors + admin
+├── api.ts                    # Copy to frontend: src/lib/api.ts
+├── .env.example
+└── package.json
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Step 1 — Supabase Setup
 
-**Use GitHub Codespaces**
+1. Go to [https://supabase.com](https://supabase.com) → New Project
+2. In the **SQL Editor**, paste the contents of `schema.sql` and run it
+3. Get your connection string from:
+   **Project Settings → Database → Connection string → URI**
+   It looks like: `postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres`
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+---
 
-## What technologies are used for this project?
+## Step 2 — Backend Setup
 
-This project is built with:
+```bash
+cd mentorx-backend
+npm install
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+# Create your .env file
+cp .env.example .env
+# Edit .env and paste your Supabase connection string as DATABASE_URL
+# Also set a strong JWT_SECRET
 
-## How can I deploy this project?
+# Seed the database
+node seed.js
 
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
+# Start the server
+npm run dev       # development (with nodemon)
+npm start         # production
+```
 
-## Can I connect a custom domain to my Lovable project?
+---
 
-Yes, you can!
+## Step 3 — Frontend Setup
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. Copy `api.ts` to your frontend at `src/lib/api.ts`
+2. Create `src/.env` (or `.env.local`) in your Vite frontend:
+   ```
+   VITE_API_URL=http://localhost:3001/api
+   ```
+3. Update your Login page to use the real API:
+   ```tsx
+   import { authApi } from "@/lib/api";
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+   const handleLogin = async (e) => {
+     e.preventDefault();
+     const { user } = await authApi.login(email, password);
+     if (user.role === 'admin') navigate('/admin');
+     else if (user.role === 'mentor') navigate('/mentor');
+     else navigate('/mentee');
+   };
+   ```
+
+---
+
+## Test Credentials
+All accounts use password: `password123`
+
+| Role   | Email                          |
+|--------|-------------------------------|
+| Admin  | admin@mentorx.edu             |
+| Mentor | suresh.menon@mentorx.edu      |
+| Mentee | student1@mentorx.edu          |
+
+---
+
+## API Endpoints Summary
+
+### Auth
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | /api/auth/login | Login (returns JWT) |
+| GET | /api/auth/me | Get current user |
+
+### Admin
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/admin/dashboard | Dashboard stats |
+| GET | /api/admin/mentors | All mentors |
+| GET | /api/admin/mentors/:id/students | Mentor's students |
+| GET | /api/admin/students | All students |
+| POST | /api/admin/users | Create user |
+| DELETE | /api/admin/users/:id | Delete user |
+| PUT | /api/admin/students/:id/assign-mentor | Assign mentor |
+| GET | /api/admin/analytics | Analytics |
+| GET | /api/admin/feedback | All feedback |
+
+### Mentor
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/mentor/dashboard | Dashboard stats |
+| GET | /api/mentor/mentees | List mentees |
+| GET | /api/mentor/mentees/:id | Full mentee profile |
+| GET | /api/mentor/alerts | High-risk / tampered / SOS alerts |
+| GET/POST | /api/mentor/meetings | Meetings |
+| GET/POST | /api/mentor/resources | Resources |
+| GET/POST | /api/mentor/forum | Forum threads |
+| POST | /api/mentor/forum/:id/reply | Reply to thread |
+| GET | /api/mentor/analytics | Analytics for mentees |
+| PUT | /api/mentor/leaves/:id | Approve/Reject leave |
+| POST | /api/mentor/mentees/:id/goals | Set goal for student |
+| GET | /api/mentor/concerns | View concerns |
+
+### Mentee
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | /api/mentee/dashboard | Dashboard |
+| GET | /api/mentee/profile | Student profile |
+| POST | /api/mentee/checkin | Submit daily check-in |
+| GET | /api/mentee/checkin/today | Check today's status |
+| GET/POST | /api/mentee/leave | Leave history & apply |
+| GET | /api/mentee/goals | Goals list |
+| PUT | /api/mentee/goals/:goalId/tasks/:taskId | Toggle task |
+| GET/POST | /api/mentee/skills | Skill log |
+| GET | /api/mentee/resources | View resources |
+| POST | /api/mentee/concern | Raise concern |
+| GET/PUT | /api/mentee/health | Health info |
+| POST | /api/mentee/sos | Trigger SOS |
+| GET/POST/DELETE | /api/mentee/documents | Documents |
+| POST | /api/mentee/feedback | Submit feedback |
+| GET | /api/mentee/notifications | Notifications |
+| PUT | /api/mentee/notifications/:id/read | Mark read |

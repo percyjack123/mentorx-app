@@ -4,16 +4,30 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "@/hooks/use-toast";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, Loader2 } from "lucide-react";
+import { menteeApi } from "@/lib/api";
 
 export default function RaiseConcern() {
   const [anonymous, setAnonymous] = useState(false);
   const [concern, setConcern] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({ title: "Concern submitted", description: anonymous ? "Your concern has been submitted anonymously." : "Your concern has been submitted." });
-    setConcern("");
+    setSubmitting(true);
+    try {
+      await menteeApi.submitConcern({ content: concern, anonymous });
+      toast({
+        title: "Concern submitted",
+        description: anonymous ? "Your concern has been submitted anonymously." : "Your concern has been submitted.",
+      });
+      setConcern("");
+      setAnonymous(false);
+    } catch {
+      toast({ title: "Error", description: "Failed to submit concern", variant: "destructive" });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -37,10 +51,19 @@ export default function RaiseConcern() {
 
         <div className="space-y-2">
           <Label htmlFor="concern">Your Concern</Label>
-          <Textarea id="concern" placeholder="Describe your concern in detail..." value={concern} onChange={e => setConcern(e.target.value)} rows={6} required />
+          <Textarea
+            id="concern"
+            placeholder="Describe your concern in detail..."
+            value={concern}
+            onChange={e => setConcern(e.target.value)}
+            rows={6}
+            required
+          />
         </div>
 
-        <Button type="submit" className="gradient-primary text-primary-foreground">Submit Concern</Button>
+        <Button type="submit" className="gradient-primary text-primary-foreground" disabled={submitting}>
+          {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Submitting...</> : "Submit Concern"}
+        </Button>
       </form>
     </div>
   );

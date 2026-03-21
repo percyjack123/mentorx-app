@@ -1,37 +1,43 @@
-import { useState } from "react";
-import { menteeGoals } from "@/data/mockData";
-import type { Goal, GoalTask } from "@/data/mockData";
-import { CheckCircle, Circle, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { menteeApi } from "@/lib/api";
+import { CheckCircle, Circle, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/hooks/use-toast";
 
 export default function Goals() {
-  const [goals, setGoals] = useState<Goal[]>(menteeGoals);
-  const [selectedGoal, setSelectedGoal] = useState<Goal | null>(null);
+  const [goals, setGoals] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedGoal, setSelectedGoal] = useState<any | null>(null);
 
-  const handleTaskToggle = (goalId: number, taskId: number) => {
-    setGoals(prev => prev.map(g => {
-      if (g.id !== goalId) return g;
-      const updatedTasks = g.tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t);
-      const completedCount = updatedTasks.filter(t => t.completed).length;
-      const progress = Math.round((completedCount / updatedTasks.length) * 100);
-      const completed = progress === 100;
-      if (completed && !g.completed) {
-        toast({ title: "Goal Completed! 🎉", description: `"${g.title}" is now complete.` });
-        setTimeout(() => setSelectedGoal(null), 800);
-      }
-      return { ...g, tasks: updatedTasks, progress, completed };
-    }));
-    // Sync selectedGoal
-    setSelectedGoal(prev => {
-      if (!prev || prev.id !== goalId) return prev;
-      const updatedTasks = prev.tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t);
-      const completedCount = updatedTasks.filter(t => t.completed).length;
-      const progress = Math.round((completedCount / updatedTasks.length) * 100);
-      return { ...prev, tasks: updatedTasks, progress, completed: progress === 100 };
-    });
+  useEffect(() => {
+    menteeApi.getGoals()
+      .then(setGoals)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const handleTaskToggle = async (goalId: number, taskId: number, currentCompleted: boolean) => {
+    try {
+      const updated = await menteeApi.updateTask(goalId, taskId, !currentCompleted) as any;
+      setGoals(prev => prev.map(g => g.id === goalId ? { ...g, ...updated, tasks: g.tasks.map((t: any) => t.id === taskId ? { ...t, completed: !currentCompleted } : t) } : g));
+      // Sync selectedGoal
+      setSelectedGoal((prev: any) => {
+        if (!prev || prev.id !== goalId) return prev;
+        const updatedTasks = prev.tasks.map((t: any) => t.id === taskId ? { ...t, completed: !currentCompleted } : t);
+        const progress = Math.round((updatedTasks.filter((t: any) => t.completed).length / updatedTasks.length) * 100);
+        if (progress === 100) {
+          toast({ title: "Goal Completed! 🎉", description: `"${prev.title}" is now complete.` });
+          setTimeout(() => setSelectedGoal(null), 800);
+        }
+        return { ...prev, tasks: updatedTasks, progress, completed: progress === 100 };
+      });
+    } catch {
+      toast({ title: "Error", description: "Failed to update task", variant: "destructive" });
+    }
   };
+
+  if (loading) return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /> Loading...</div>;
 
   return (
     <div className="space-y-6 max-w-3xl">
@@ -41,18 +47,14 @@ export default function Goals() {
       </div>
 
       <div className="grid gap-4">
+        {goals.length === 0 && <p className="text-sm text-muted-foreground">No goals assigned yet.</p>}
         {goals.map(goal => (
-          <div
-            key={goal.id}
-            onClick={() => setSelectedGoal(goal)}
-            className="rounded-xl border bg-card p-6 transition-all duration-200 hover:shadow-lg hover:scale-[1.01] cursor-pointer"
-          >
+          <div key={goal.id} onClick={() => setSelectedGoal(goal)}
+            className="rounded-xl border bg-card p-6 transition-all duration-200 hover:shadow-lg hover:scale-[1.01] cursor-pointer">
             <div className="flex items-start gap-3">
-              {goal.completed ? (
-                <CheckCircle className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
-              ) : (
-                <Circle className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />
-              )}
+              {goal.completed
+                ? <CheckCircle className="h-5 w-5 text-success mt-0.5 flex-shrink-0" />
+                : <Circle className="h-5 w-5 text-muted-foreground mt-0.5 flex-shrink-0" />}
               <div className="flex-1">
                 <h3 className={`font-medium ${goal.completed ? "line-through text-muted-foreground" : ""}`}>{goal.title}</h3>
                 <p className="text-sm text-muted-foreground mt-1">{goal.description}</p>
@@ -62,10 +64,8 @@ export default function Goals() {
                     <span className="text-xs font-medium">{goal.progress}%</span>
                   </div>
                   <div className="w-full bg-muted rounded-full h-2">
-                    <div
-                      className={`h-2 rounded-full transition-all duration-500 ${goal.completed ? "bg-success" : "gradient-primary"}`}
-                      style={{ width: `${goal.progress}%` }}
-                    />
+                    <div className={`h-2 rounded-full transition-all duration-500 ${goal.completed ? "bg-success" : "gradient-primary"}`}
+                      style={{ width: `${goal.progress}%` }} />
                   </div>
                 </div>
               </div>
@@ -74,7 +74,7 @@ export default function Goals() {
         ))}
       </div>
 
-      <Dialog open={!!selectedGoal} onOpenChange={(open) => !open && setSelectedGoal(null)}>
+      <Dialog open={!!selectedGoal} onOpenChange={open => !open && setSelectedGoal(null)}>
         <DialogContent className="max-w-md">
           {selectedGoal && (
             <>
@@ -90,21 +90,23 @@ export default function Goals() {
                   </div>
                   <div className="p-3 rounded-lg bg-muted/50">
                     <span className="text-xs text-muted-foreground block">Deadline</span>
-                    <span className="font-medium">{selectedGoal.deadline}</span>
+                    <span className="font-medium">{selectedGoal.deadline ? new Date(selectedGoal.deadline).toLocaleDateString() : "N/A"}</span>
                   </div>
                 </div>
-                <div className="p-3 rounded-lg bg-accent/50">
-                  <span className="text-xs text-muted-foreground block mb-1">Mentor Note</span>
-                  <p className="text-sm">{selectedGoal.mentorNote}</p>
-                </div>
+                {selectedGoal.mentor_note && (
+                  <div className="p-3 rounded-lg bg-accent/50">
+                    <span className="text-xs text-muted-foreground block mb-1">Mentor Note</span>
+                    <p className="text-sm">{selectedGoal.mentor_note}</p>
+                  </div>
+                )}
                 <div>
                   <h4 className="text-sm font-semibold mb-2">Task Checklist</h4>
                   <div className="space-y-2">
-                    {selectedGoal.tasks.map(task => (
+                    {selectedGoal.tasks?.filter(Boolean).map((task: any) => (
                       <label key={task.id} className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 cursor-pointer transition-colors">
                         <Checkbox
                           checked={task.completed}
-                          onCheckedChange={() => handleTaskToggle(selectedGoal.id, task.id)}
+                          onCheckedChange={() => handleTaskToggle(selectedGoal.id, task.id, task.completed)}
                         />
                         <span className={`text-sm ${task.completed ? "line-through text-muted-foreground" : ""}`}>{task.title}</span>
                       </label>
@@ -112,10 +114,8 @@ export default function Goals() {
                   </div>
                 </div>
                 <div className="w-full bg-muted rounded-full h-2">
-                  <div
-                    className={`h-2 rounded-full transition-all duration-500 ${selectedGoal.completed ? "bg-success" : "gradient-primary"}`}
-                    style={{ width: `${selectedGoal.progress}%` }}
-                  />
+                  <div className={`h-2 rounded-full transition-all duration-500 ${selectedGoal.completed ? "bg-success" : "gradient-primary"}`}
+                    style={{ width: `${selectedGoal.progress}%` }} />
                 </div>
               </div>
             </>
