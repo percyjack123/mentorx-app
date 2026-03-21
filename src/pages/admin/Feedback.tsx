@@ -1,0 +1,77 @@
+import { mentors, feedbackEntries } from "@/data/mockData";
+import { Star } from "lucide-react";
+import { StatsCard } from "@/components/StatsCard";
+
+export default function Feedback() {
+  const totalFeedback = feedbackEntries.length;
+  const avgRating = +(feedbackEntries.reduce((s, f) => s + f.rating, 0) / totalFeedback).toFixed(1);
+  const mentorsReviewed = new Set(feedbackEntries.map(f => f.mentorId)).size;
+
+  const mentorRatings = mentors.map(m => {
+    const entries = feedbackEntries.filter(f => f.mentorId === m.id);
+    const avg = entries.length ? +(entries.reduce((s, f) => s + f.rating, 0) / entries.length).toFixed(1) : 0;
+    return { ...m, avgRating: avg, reviewCount: entries.length };
+  });
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold font-display">Feedback Analytics</h1>
+        <p className="text-muted-foreground">Anonymous mentor feedback overview</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <StatsCard title="Average Rating" value={`${avgRating} / 5`} icon={<Star className="h-5 w-5 text-warning" />} gradient />
+        <StatsCard title="Total Feedback" value={totalFeedback} icon={<Star className="h-5 w-5 text-primary" />} />
+        <StatsCard title="Mentors Reviewed" value={mentorsReviewed} icon={<Star className="h-5 w-5 text-secondary" />} />
+      </div>
+
+      <div className="rounded-xl border bg-card overflow-hidden">
+        <div className="p-4 border-b"><h3 className="font-semibold font-display">Mentor Ratings</h3></div>
+        <table className="w-full text-sm">
+          <thead><tr className="border-b bg-muted/50"><th className="text-left py-3 px-4 font-medium">Mentor</th><th className="text-left py-3 px-4 font-medium">Department</th><th className="text-left py-3 px-4 font-medium">Avg Rating</th><th className="text-left py-3 px-4 font-medium">Reviews</th></tr></thead>
+          <tbody>
+            {mentorRatings.map(m => (
+              <tr key={m.id} className="border-b last:border-0 hover:bg-accent/30 transition-colors">
+                <td className="py-3 px-4 font-medium">{m.name}</td>
+                <td className="py-3 px-4">{m.department}</td>
+                <td className="py-3 px-4">
+                  <div className="flex items-center gap-1">
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <Star key={s} className={`h-3 w-3 ${s <= Math.round(m.avgRating) ? "fill-warning text-warning" : "text-muted-foreground/30"}`} />
+                    ))}
+                    <span className="ml-1">{m.avgRating}</span>
+                  </div>
+                </td>
+                <td className="py-3 px-4">{m.reviewCount}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="rounded-xl border bg-card p-6">
+        <h3 className="font-semibold font-display mb-4">Anonymous Comments</h3>
+        <div className="space-y-4">
+          {feedbackEntries.map(f => {
+            const mentor = mentors.find(m => m.id === f.mentorId);
+            return (
+              <div key={f.id} className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-medium text-sm">{mentor?.name}</span>
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map(s => (
+                      <Star key={s} className={`h-3 w-3 ${s <= f.rating ? "fill-warning text-warning" : "text-muted-foreground/30"}`} />
+                    ))}
+                  </div>
+                </div>
+                <p className="text-sm">{f.comment}</p>
+                <p className="text-xs text-muted-foreground mt-2">{f.date} • Anonymous</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
