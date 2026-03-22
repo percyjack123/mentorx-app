@@ -1,0 +1,61 @@
+name,roll_no,department,semester,mentor,cgpa,attendance,mood_score,backlog_count,placement_status,resource_needed,student_type,placement_encoded,risk_level,risk_encoded,predicted_risk,red_probability,predicted_next_cgpa,primary_concern,intervention
+Jalapathi Sahithi,21CS001,ME,5,Prof. Ajit Kumar Pasayat,6.12,100.0,2,0,Not Started,Counseling,Hosteller,0,Yellow,1,Yellow,10.0,6.24,Mood,Mood 2/5 — check on student.
+Saumya Kumari,21CS002,ECE,6,Prof. Sharma,9.52,86.2,2,0,Applied,Placement Prep,Hosteller,2,Yellow,1,Yellow,0.0,5.72,Mood,Mood 2/5 — check on student.
+Supriya Rani Gouda,21CS003,CE,7,Prof. Patel,6.71,62.8,1,0,Placed,Mock Tests,Day Scholar,4,Red,2,Red,79.0,6.64,Mood,URGENT: Mood 1/5 — refer to counselor.
+Snigdha Keshri,21CS004,CSE,3,Prof. Verma,4.18,85.5,4,0,Preparing,Mock Tests,Hosteller,1,Red,2,Red,100.0,7.12,CGPA,URGENT: CGPA 4.18 — academic support now.
+Keshav Agrawal,21CS005,CE,4,Prof. Ajit Kumar Pasayat,7.23,72.3,4,0,Preparing,None,Hosteller,1,Yellow,1,Yellow,19.0,7.72,Attendance,Attendance 72.3% — send reminder.
+Aryan Chauhan,21CS006,ECE,4,Prof. Sharma,9.64,73.7,3,0,Placed,Project Guidance,Day Scholar,4,Yellow,1,Yellow,0.0,4.78,Mood,Mood 3/5 — check on student.
+Aman Sharma,21CS007,ECE,5,Prof. Patel,7.33,52.1,2,0,Not Started,Project Guidance,Hosteller,0,Red,2,Red,87.0,5.59,Mood,URGENT: Mood 2/5 — refer to counselor.
+Riya Patel,21CS008,CSE,7,Prof. Verma,8.26,87.5,3,0,Placed,Project Guidance,Day Scholar,4,Green,0,Green,6.0,6.3,Mood,Regular monitoring.
+Neha Verma,21CS009,ME,5,Prof. Ajit Kumar Pasayat,7.61,87.2,2,0,Interview Stage,Project Guidance,Day Scholar,3,Yellow,1,Yellow,0.0,7.28,Mood,Mood 2/5 — check on student.
+Rahul Gupta,21CS010,CE,6,Prof. Sharma,5.63,46.7,3,0,Not Started,Mock Tests,Day Scholar,0,Red,2,Red,97.0,5.2,Attendance,URGENT: Attendance 46.7% — call student.
+Pooja Singh,21CS011,ECE,5,Prof. Patel,7.39,85.5,2,0,Applied,Placement Prep,Hosteller,2,Yellow,1,Yellow,2.0,5.46,Mood,Mood 2/5 — check on student.
+Arjun Nair,21CS012,ECE,3,Prof. Verma,4.14,59.7,3,0,Not Started,Counseling,Hosteller,0,Red,2,Red,99.0,7.17,CGPA,URGENT: CGPA 4.14 — academic support now.
+Sneha Reddy,21CS013,CSE,4,Prof. Ajit Kumar Pasayat,5.22,96.7,1,0,Applied,Mock Tests,Day Scholar,2,Red,2,Red,86.0,4.93,Mood,URGENT: Mood 1/5 — refer to counselor.
+Vikram Rao,21CS014,ECE,6,Prof. Sharma,4.99,96.7,2,1,Preparing,Counseling,Hosteller,1,Red,2,Red,92.0,7.04,Mood,URGENT: Mood 2/5 — refer to counselor.
+Priya Menon,21CS015,CSE,5,Prof. Patel,5.26,53.6,4,0,Preparing,Counseling,Hosteller,1,Red,2,Red,98.0,6.51,CGPA,URGENT: CGPA 5.26 — academic support now.
+Karthik Das,21CS016,IT,3,Prof. Verma,3.84,67.1,3,0,Preparing,Study Material,Day Scholar,1,Red,2,Red,97.0,8.33,CGPA,URGENT: CGPA 3.84 — academic support now.
+Divya Iyer,21CS017,IT,6,Prof. Ajit Kumar Pasayat,8.32,61.7,3,0,Interview Stage,Placement Prep,Day Scholar,3,Yellow,1,Yellow,17.0,6.0,Mood,Mood 3/5 — check on student.
+Rohit Kumar,21CS018,CE,6,Prof. Sharma,4.45,51.4,4,0,Applied,Mock Tests,Hosteller,2,Red,2,Red,87.0,7.2,CGPA,URGENT: CGPA 4.45 — academic support now.
+Anjali Bose,21CS019,ME,3,Prof. Patel,4.64,89.4,4,0,Preparing,Study Material,Day Scholar,1,Red,2,Red,100.0,7.15,CGPA,URGENT: CGPA 4.64 — academic support now.
+Suresh Pillai,21CS020,CSE,7,Prof. Verma,4.97,66.4,3,0,Preparing,Counseling,Day Scholar,1,Red,2,Red,97.0,7.12,CGPA,URGENT: CGPA 4.97 — academic support now.
+Jalapathi Sahithi,21CS021,ME,3,Prof. Ajit Kumar Pasayat,9.73,58.9,3,0,Interview Stage,Project Guidance,Hosteller,3,Yellow,1,Yellow,11.0,5.65,Attendance,Attendance 58.9% — send reminder.
+Saumya Kumari,21CS022,CSE,7,Prof. Sharma,9.92,70.8,2,0,Placed,None,Day Scholar,4,Yellow,1,Yellow,6.0,4.74,Mood,Mood 2/5 — check on student.
+Supriya Rani Gouda,21CS023,CE,5,Prof. Patel,9.3,41.5,2,0,Interview Stage,Placement Prep,Day Scholar,3,Red,2,Red,81.0,6.58,Mood,URGENT: Mood 2/5 — refer to counselor.
+Snigdha Keshri,21CS024,CSE,4,Prof. Verma,3.41,81.6,3,1,Preparing,Study Material,Day Scholar,1,Red,2,Red,100.0,7.38,CGPA,URGENT: CGPA 3.41 — academic support now.
+Keshav Agrawal,21CS025,ME,6,Prof. Ajit Kumar Pasayat,9.39,96.5,5,0,Placed,Project Guidance,Day Scholar,4,Green,0,Green,6.0,5.27,CGPA,Regular monitoring.
+Aryan Chauhan,21CS026,CE,3,Prof. Sharma,4.43,70.8,2,0,Applied,Mock Tests,Hosteller,2,Red,2,Red,93.0,6.83,Mood,URGENT: Mood 2/5 — refer to counselor.
+Aman Sharma,21CS027,CSE,6,Prof. Patel,8.71,55.9,2,0,Placed,Placement Prep,Day Scholar,4,Yellow,1,Yellow,20.0,5.91,Mood,Mood 2/5 — check on student.
+Riya Patel,21CS028,CSE,3,Prof. Verma,8.18,41.6,1,0,Placed,Placement Prep,Day Scholar,4,Red,2,Red,93.0,6.34,Mood,URGENT: Mood 1/5 — refer to counselor.
+Neha Verma,21CS029,ECE,7,Prof. Ajit Kumar Pasayat,3.25,92.3,3,0,Preparing,Counseling,Day Scholar,1,Red,2,Red,99.0,6.27,CGPA,URGENT: CGPA 3.25 — academic support now.
+Rahul Gupta,21CS030,ECE,4,Prof. Sharma,4.97,70.4,2,0,Not Started,Study Material,Day Scholar,0,Red,2,Red,99.0,5.45,Mood,URGENT: Mood 2/5 — refer to counselor.
+Pooja Singh,21CS031,CSE,4,Prof. Patel,8.08,35.5,4,0,Placed,Placement Prep,Hosteller,4,Red,2,Red,89.0,5.88,Attendance,URGENT: Attendance 35.5% — call student.
+Arjun Nair,21CS032,ECE,7,Prof. Verma,7.19,86.0,4,0,Applied,Project Guidance,Day Scholar,2,Green,0,Yellow,8.0,6.98,CGPA,CGPA 7.19 — share study material.
+Sneha Reddy,21CS033,CSE,4,Prof. Ajit Kumar Pasayat,8.4,74.1,2,0,Applied,Project Guidance,Hosteller,2,Yellow,1,Yellow,9.0,5.25,Mood,Mood 2/5 — check on student.
+Vikram Rao,21CS034,ME,7,Prof. Sharma,8.32,38.4,3,0,Applied,Project Guidance,Hosteller,2,Red,2,Red,89.0,5.14,Attendance,URGENT: Attendance 38.4% — call student.
+Priya Menon,21CS035,CSE,7,Prof. Patel,5.25,100.0,4,2,Preparing,Study Material,Hosteller,1,Red,2,Red,95.0,6.1,CGPA,URGENT: CGPA 5.25 — academic support now.
+Karthik Das,21CS036,CSE,6,Prof. Verma,7.53,76.9,2,0,Preparing,Placement Prep,Hosteller,1,Yellow,1,Yellow,9.0,5.32,Mood,Mood 2/5 — check on student.
+Divya Iyer,21CS037,ME,7,Prof. Ajit Kumar Pasayat,10.0,47.0,2,0,Placed,Project Guidance,Hosteller,4,Red,2,Red,60.0,5.55,Mood,URGENT: Mood 2/5 — refer to counselor.
+Rohit Kumar,21CS038,ME,4,Prof. Sharma,7.16,73.9,3,0,Interview Stage,None,Day Scholar,3,Yellow,1,Yellow,8.0,6.11,Mood,Mood 3/5 — check on student.
+Anjali Bose,21CS039,IT,7,Prof. Patel,4.81,42.8,3,0,Not Started,Study Material,Hosteller,0,Red,2,Red,100.0,6.08,Attendance,URGENT: Attendance 42.8% — call student.
+Suresh Pillai,21CS040,ECE,4,Prof. Verma,8.97,92.3,2,0,Placed,Project Guidance,Hosteller,4,Yellow,1,Yellow,2.0,5.47,Mood,Mood 2/5 — check on student.
+Jalapathi Sahithi,21CS041,ME,6,Prof. Ajit Kumar Pasayat,6.81,45.4,3,0,Interview Stage,Project Guidance,Day Scholar,3,Red,2,Red,89.0,6.83,Attendance,URGENT: Attendance 45.4% — call student.
+Saumya Kumari,21CS042,IT,7,Prof. Sharma,6.17,55.1,3,0,Applied,Study Material,Hosteller,2,Yellow,1,Yellow,23.0,5.65,Attendance,Attendance 55.1% — send reminder.
+Supriya Rani Gouda,21CS043,CSE,3,Prof. Patel,3.71,96.0,2,0,Not Started,Study Material,Day Scholar,0,Red,2,Red,83.0,5.88,CGPA,URGENT: CGPA 3.71 — academic support now.
+Snigdha Keshri,21CS044,ME,6,Prof. Verma,8.06,89.1,2,0,Interview Stage,Placement Prep,Hosteller,3,Yellow,1,Yellow,0.0,6.0,Mood,Mood 2/5 — check on student.
+Keshav Agrawal,21CS045,ECE,7,Prof. Ajit Kumar Pasayat,4.9,75.4,1,0,Not Started,Mock Tests,Day Scholar,0,Red,2,Red,97.0,5.1,Mood,URGENT: Mood 1/5 — refer to counselor.
+Aryan Chauhan,21CS046,CE,7,Prof. Sharma,5.97,94.7,2,0,Not Started,None,Hosteller,0,Yellow,1,Yellow,19.0,5.15,Mood,Mood 2/5 — check on student.
+Aman Sharma,21CS047,CE,5,Prof. Patel,3.29,49.6,4,0,Preparing,Counseling,Hosteller,1,Red,2,Red,99.0,7.34,CGPA,URGENT: CGPA 3.29 — academic support now.
+Riya Patel,21CS048,ME,6,Prof. Verma,6.42,48.2,3,0,Not Started,Placement Prep,Hosteller,0,Red,2,Red,95.0,6.06,Attendance,URGENT: Attendance 48.2% — call student.
+Neha Verma,21CS049,CE,3,Prof. Ajit Kumar Pasayat,4.15,68.9,3,0,Applied,Study Material,Hosteller,2,Red,2,Red,87.0,8.21,CGPA,URGENT: CGPA 4.15 — academic support now.
+Rahul Gupta,21CS050,ME,5,Prof. Sharma,4.28,88.9,2,0,Not Started,Study Material,Hosteller,0,Red,2,Red,93.0,4.87,Mood,URGENT: Mood 2/5 — refer to counselor.
+Pooja Singh,21CS051,ECE,3,Prof. Patel,8.42,71.8,3,0,Placed,Project Guidance,Day Scholar,4,Yellow,1,Yellow,6.0,4.91,Mood,Mood 3/5 — check on student.
+Arjun Nair,21CS052,CSE,5,Prof. Verma,4.37,67.1,3,1,Not Started,Study Material,Hosteller,0,Red,2,Red,98.0,6.86,CGPA,URGENT: CGPA 4.37 — academic support now.
+Sneha Reddy,21CS053,CSE,4,Prof. Ajit Kumar Pasayat,6.96,54.5,2,0,Applied,Placement Prep,Hosteller,2,Red,2,Red,88.0,7.37,Mood,URGENT: Mood 2/5 — refer to counselor.
+Vikram Rao,21CS054,CSE,4,Prof. Sharma,8.58,60.0,4,0,Interview Stage,None,Day Scholar,3,Yellow,1,Yellow,10.0,6.51,Attendance,Attendance 60.0% — send reminder.
+Priya Menon,21CS055,CSE,4,Prof. Patel,4.7,83.7,3,0,Preparing,Counseling,Day Scholar,1,Red,2,Red,99.0,7.31,CGPA,URGENT: CGPA 4.7 — academic support now.
+Karthik Das,21CS056,CSE,4,Prof. Verma,6.76,84.5,2,0,Interview Stage,Project Guidance,Day Scholar,3,Yellow,1,Yellow,30.0,6.74,Mood,Mood 2/5 — check on student.
+Divya Iyer,21CS057,ME,6,Prof. Ajit Kumar Pasayat,6.55,47.2,2,0,Preparing,Counseling,Hosteller,1,Red,2,Red,96.0,6.34,Mood,URGENT: Mood 2/5 — refer to counselor.
+Rohit Kumar,21CS058,ME,4,Prof. Sharma,7.15,76.1,3,0,Applied,Project Guidance,Hosteller,2,Green,0,Green,2.0,7.09,Mood,Regular monitoring.
+Anjali Bose,21CS059,CSE,6,Prof. Patel,5.02,82.8,3,0,Not Started,Study Material,Day Scholar,0,Red,2,Red,99.0,7.06,CGPA,URGENT: CGPA 5.02 — academic support now.
+Suresh Pillai,21CS060,ME,5,Prof. Verma,4.12,92.1,2,0,Preparing,Mock Tests,Day Scholar,1,Red,2,Red,95.0,6.74,Mood,URGENT: Mood 2/5 — refer to counselor.
