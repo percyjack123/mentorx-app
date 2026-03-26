@@ -37,6 +37,8 @@ app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date()
 
 app.post("/predict-risk", async (req, res) => {
   try {
+    console.log("➡️ Sending:", req.body);
+
     const response = await fetch("https://supriya202q-ml-work-api.hf.space/predict", {
       method: "POST",
       headers: {
@@ -45,12 +47,19 @@ app.post("/predict-risk", async (req, res) => {
       body: JSON.stringify(req.body),
     });
 
-    const data = await response.json();
+    const text = await response.text();   // 🔥 CHANGE HERE
+    console.log("⬅️ Response from ML:", text);
+
+    const data = JSON.parse(text);        // 🔥 SAFE PARSE
 
     res.json(data);
+
   } catch (error) {
-    console.error("ML ERROR:", error);
-    res.status(500).json({ error: "ML API failed" });
+    console.error("❌ FULL ERROR:", error);
+    res.status(500).json({
+      error: "ML API failed",
+      details: error.message
+    });
   }
 });
 
