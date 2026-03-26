@@ -34,6 +34,25 @@ app.use('/api/mentee', menteeRoutes);
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+app.post("/predict-risk", async (req, res) => {
+  try {
+    const response = await fetch("https://supriya202q-ml-work-api.hf.space/predict", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(req.body),
+    });
+
+    const data = await response.json();
+
+    res.json(data);
+  } catch (error) {
+    console.error("ML ERROR:", error);
+    res.status(500).json({ error: "ML API failed" });
+  }
+});
+
 // 404
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 
