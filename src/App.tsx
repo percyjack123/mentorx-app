@@ -12,6 +12,7 @@ import Register from "./pages/auth/Register";
 import AdminLayout from "./layouts/AdminLayout";
 import MentorLayout from "./layouts/MentorLayout";
 import MenteeLayout from "./layouts/MenteeLayout";
+import ParentLayout from "./layouts/ParentLayout";
 
 // Admin pages
 import AdminDashboard from "./pages/admin/Dashboard";
@@ -43,6 +44,16 @@ import RaiseConcern from "./pages/mentee/RaiseConcern";
 import HealthInfo from "./pages/mentee/HealthInfo";
 import SOS from "./pages/mentee/SOS";
 import MenteeFeedback from "./pages/mentee/Feedback";
+
+// Parent pages
+import ParentDashboard from "./pages/parent/Dashboard";
+import MyChildren from "./pages/parent/Children";
+import ChildProfile from "./pages/parent/ChildProfile";
+import ParentNotifications from "./pages/parent/Notifications";
+import ParentMeetings from "./pages/parent/Meetings";
+import ParentResources from "./pages/parent/Resources";
+import ParentAnnouncements from "./pages/parent/Announcements";
+import ParentAnalytics from "./pages/parent/Analytics";
 
 import NotFound from "./pages/NotFound";
 
@@ -94,6 +105,18 @@ const App = () => (
             <Route path="health" element={<HealthInfo />} />
             <Route path="sos" element={<SOS />} />
             <Route path="feedback" element={<MenteeFeedback />} />
+          </Route>
+
+          {/* Parent Routes */}
+          <Route path="/parent" element={<ParentLayout />}>
+            <Route index element={<ParentDashboard />} />
+            <Route path="children" element={<MyChildren />} />
+            <Route path="children/:id" element={<ChildProfile />} />
+            <Route path="notifications" element={<ParentNotifications />} />
+            <Route path="meetings" element={<ParentMeetings />} />
+            <Route path="resources" element={<ParentResources />} />
+            <Route path="announcements" element={<ParentAnnouncements />} />
+            <Route path="analytics" element={<ParentAnalytics />} />
           </Route>
 
           <Route path="*" element={<NotFound />} />

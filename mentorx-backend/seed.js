@@ -1,5 +1,5 @@
 // seed.js — Run with: node seed.js
-// Requires: npm install pg bcryptjs dotenv
+// Creates all users including 4 sample parents linked to students
 require('dotenv').config();
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
@@ -28,7 +28,7 @@ async function seed() {
       TRUNCATE notifications, sos_alerts, feedback_entries, documents, health_info,
         concerns, skill_entries, goal_tasks, goals, forum_replies, forum_threads,
         resources, meeting_students, meetings, leave_records, check_ins,
-        students, mentors, users RESTART IDENTITY CASCADE
+        parents, students, mentors, users RESTART IDENTITY CASCADE
     `);
 
     const hash = await bcrypt.hash('password123', 10);
@@ -76,7 +76,7 @@ async function seed() {
       const cgpa = riskLevel === 'Safe' ? randFloat(7,10) : riskLevel === 'Moderate' ? randFloat(5,7.9) : randFloat(2,5.9);
       const attendance = riskLevel === 'Safe' ? randInt(80,100) : riskLevel === 'Moderate' ? randInt(60,84) : randInt(30,64);
       const mood = riskLevel === 'Safe' ? rand(['Happy','Neutral']) : riskLevel === 'Moderate' ? rand(['Neutral','Stressed']) : rand(['Stressed','Sad','Anxious']);
-      const mentorId = mentorIds[Math.floor(i / 10)]; // 10 students per mentor
+      const mentorId = mentorIds[Math.floor(i / 10)];
       const lastCheckIn = new Date(2026, 2, randInt(10, 20)).toISOString().split('T')[0];
 
       const ur = await client.query(
@@ -133,7 +133,27 @@ async function seed() {
       );
     }
 
-    // ── LEAVE RECORDS (sample) ──
+    // ── PARENTS (4 sample parents linked to first 4 students) ──
+    const parentData = [
+      { name: 'Rajiv Sharma',  email: 'parent1@mentorx.edu', studentIdx: 0, relationship: 'Father' },
+      { name: 'Sunita Patel',  email: 'parent2@mentorx.edu', studentIdx: 1, relationship: 'Mother' },
+      { name: 'Mohan Kumar',   email: 'parent3@mentorx.edu', studentIdx: 2, relationship: 'Father' },
+      { name: 'Lata Singh',    email: 'parent4@mentorx.edu', studentIdx: 3, relationship: 'Mother' },
+    ];
+    const parentIds = [];
+    for (const p of parentData) {
+      const ur = await client.query(
+        `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'parent') RETURNING id`,
+        [p.name, p.email, hash]
+      );
+      const pr = await client.query(
+        `INSERT INTO parents (user_id, student_id, relationship) VALUES ($1,$2,$3) RETURNING id`,
+        [ur.rows[0].id, studentIds[p.studentIdx], p.relationship]
+      );
+      parentIds.push(pr.rows[0].id);
+    }
+
+    // ── LEAVE RECORDS ──
     const leaveData = [
       { idx: 0, from: '2026-03-01', to: '2026-03-03', reason: 'Family function', status: 'Approved' },
       { idx: 1, from: '2026-03-05', to: '2026-03-06', reason: 'Medical', status: 'Pending' },
@@ -199,6 +219,12 @@ async function seed() {
 
     await client.query(
       `INSERT INTO forum_threads (title, content, author_id, pinned)
+       VALUES ('Upcoming workshop on stress management','We''re organizing a workshop next week. Please encourage your mentees to attend.',$1,true)`,
+      [mentorUserIds[3]]
+    );
+
+    await client.query(
+      `INSERT INTO forum_threads (title, content, author_id, pinned)
        VALUES ('Best practices for early intervention','What early warning signs do you look for in at-risk students?',$1,false)`,
       [mentorUserIds[3]]
     );
@@ -259,10 +285,12 @@ async function seed() {
 
     await client.query('COMMIT');
     console.log('✅ Database seeded successfully!');
-    console.log('\nTest credentials (all use password: password123)');
-    console.log('  Admin:  admin@mentorx.edu');
-    console.log('  Mentor: suresh.menon@mentorx.edu');
-    console.log('  Mentee: student1@mentorx.edu');
+    console.log('\n📋 Test credentials (password: password123)');
+    console.log('  Admin:   admin@mentorx.edu');
+    console.log('  Mentor:  suresh.menon@mentorx.edu');
+    console.log('  Student: student1@mentorx.edu');
+    console.log('  Parent:  parent1@mentorx.edu  (linked to student1)');
+    console.log('  Parent:  parent2@mentorx.edu  (linked to student2)');
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('❌ Seeding failed:', err.message);

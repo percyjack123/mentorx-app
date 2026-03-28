@@ -1,12 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Moon, Sun, Bell, LogOut } from "lucide-react";
-import { authApi, getUser } from "@/lib/api";
-import { menteeApi, mentorApi } from "@/lib/api";
+import { authApi, getUser, menteeApi, parentApi } from "@/lib/api";
 import { formatDistanceToNow } from "date-fns";
 
 interface NavbarProps {
-  role: "admin" | "mentor" | "mentee";
+  role: "admin" | "mentor" | "mentee" | "parent";
   title: string;
 }
 
@@ -29,6 +28,18 @@ export function Navbar({ role, title }: NavbarProps) {
   useEffect(() => {
     if (role === "mentee") {
       menteeApi.getNotifications().then((data: any) => setNotifications(data)).catch(() => {});
+    } else if (role === "parent") {
+      // For parents, build simple notifications from alerts
+      parentApi.getNotifications().then((data: any) => {
+        const notifs: Notification[] = [];
+        data?.highRisk?.forEach((s: any, i: number) => {
+          notifs.push({ id: i + 1000, type: 'alert', message: `🚨 ${s.name} is at High risk`, read: false, created_at: new Date().toISOString() });
+        });
+        data?.sosAlerts?.forEach((s: any, i: number) => {
+          notifs.push({ id: i + 2000, type: 'sos', message: `🆘 SOS alert for ${s.name}`, read: false, created_at: new Date().toISOString() });
+        });
+        setNotifications(notifs);
+      }).catch(() => {});
     }
   }, [role]);
 
@@ -83,7 +94,9 @@ export function Navbar({ role, title }: NavbarProps) {
                 {notifications.length > 0 ? notifications.map(n => (
                   <div key={n.id} className={`p-3 border-b last:border-0 hover:bg-accent/50 transition-colors ${!n.read ? 'bg-accent/20' : ''}`}>
                     <p className="text-sm">{n.message}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {formatDistanceToNow(new Date(n.created_at), { addSuffix: true })}
+                    </p>
                   </div>
                 )) : (
                   <div className="p-4 text-sm text-muted-foreground text-center">No notifications</div>

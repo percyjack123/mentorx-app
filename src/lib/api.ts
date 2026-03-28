@@ -1,6 +1,4 @@
 // src/lib/api.ts
-// Frontend API client for MentorX backend
-
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
 
 // ── Token helpers ──────────────────────────────────────────
@@ -20,15 +18,12 @@ export interface AuthUser {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'mentor' | 'mentee';
+  role: 'admin' | 'mentor' | 'mentee' | 'parent';
   roleId: number | null;
 }
 
 // ── Core fetch wrapper ─────────────────────────────────────
-async function request<T>(
-  path: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = getToken();
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -84,7 +79,7 @@ export const adminApi = {
 
   getStudents: () => get<object[]>('/admin/students'),
 
-  createUser: (data: { name: string; email: string; password: string; role: string; department?: string }) =>
+  createUser: (data: { name: string; email: string; password: string; role: string; department?: string; studentId?: number }) =>
     post<{ message: string; userId: number }>('/admin/users', data),
 
   deleteUser: (userId: number) => del<{ message: string }>(`/admin/users/${userId}`),
@@ -197,4 +192,54 @@ export const menteeApi = {
   markNotificationRead: (id: number) => put<{ message: string }>(`/mentee/notifications/${id}/read`, {}),
 };
 
-export default { authApi, adminApi, mentorApi, menteeApi };
+// ══════════════════════════════════════════════════════════
+//  PARENT
+// ══════════════════════════════════════════════════════════
+export const parentApi = {
+  getDashboard: () => get<{
+    studentName: string; riskLevel: string; pendingLeaves: number;
+    completedCheckIns: number; student: object | null; recentAlerts: object[];
+  }>('/parent/dashboard'),
+
+  getChildren: () => get<object[]>('/parent/children'),
+
+  getChild: (id: number) => get<{
+    student: object; checkIns: object[]; leaveRecords: object[];
+    documents: object[]; skillEntries: object[]; healthInfo: object | null; mentorFeedback: object[];
+  }>(`/parent/children/${id}`),
+
+  getNotifications: () => get<{
+    highRisk: object[]; lowAttendance: object[];
+    missedCheckins: object[]; sosAlerts: object[];
+  }>('/parent/notifications'),
+
+  getMeetings: () => get<object[]>('/parent/meetings'),
+
+  getResources: () => get<object[]>('/parent/resources'),
+
+  getAnnouncements: () => get<object[]>('/parent/announcements'),
+
+  getAnalytics: () => get<{
+    riskDistribution: object[]; cgpaTrends: object[];
+    attendanceDistribution: object[]; checkInFrequency: object[];
+  }>('/parent/analytics'),
+};
+
+// ══════════════════════════════════════════════════════════
+//  ML PREDICTION
+// ══════════════════════════════════════════════════════════
+export const mlApi = {
+  predictRisk: (data: {
+    cgpa: number;
+    attendance: number;
+    mood_score: number;
+    backlog_count: number;
+    placement_status: number;
+  }) => fetch(`${BASE_URL.replace('/api', '')}/predict-risk`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  }).then(r => r.json()),
+};
+
+export default { authApi, adminApi, mentorApi, menteeApi, parentApi, mlApi };

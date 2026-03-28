@@ -21,7 +21,6 @@ export default function Login() {
     try {
       const { user } = await authApi.login(email, password);
 
-      // Verify selected role matches actual role from DB
       if (role && user.role !== role) {
         toast({
           title: "Wrong role selected",
@@ -35,6 +34,7 @@ export default function Login() {
       toast({ title: "Welcome back!", description: `Signed in as ${user.name}` });
       if (user.role === "admin") navigate("/admin");
       else if (user.role === "mentor") navigate("/mentor");
+      else if (user.role === "parent") navigate("/parent");
       else navigate("/mentee");
     } catch (err: any) {
       toast({ title: "Login failed", description: err.message || "Invalid credentials", variant: "destructive" });
@@ -59,25 +59,11 @@ export default function Login() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="you@university.edu"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                required
-              />
+              <Input id="email" type="email" placeholder="you@university.edu" value={email} onChange={e => setEmail(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                required
-              />
+              <Input id="password" type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
@@ -86,19 +72,13 @@ export default function Login() {
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="mentor">Mentor</SelectItem>
-                  <SelectItem value="mentee">Mentee</SelectItem>
+                  <SelectItem value="mentee">Mentee / Student</SelectItem>
+                  <SelectItem value="parent">Parent / Guardian</SelectItem>
                 </SelectContent>
               </Select>
             </div>
-            <Button
-              type="submit"
-              className="w-full gradient-primary text-primary-foreground"
-              disabled={!role || loading}
-            >
-              {loading
-                ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</>
-                : "Sign In"
-              }
+            <Button type="submit" className="w-full gradient-primary text-primary-foreground" disabled={!role || loading}>
+              {loading ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</> : "Sign In"}
             </Button>
           </form>
           <div className="mt-4 text-center">
@@ -109,6 +89,10 @@ export default function Login() {
             <button onClick={() => navigate("/register")} className="text-sm text-primary hover:underline">Register</button>
           </div>
         </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-6">
+          Demo: admin@mentorx.edu / mentor: suresh.menon@mentorx.edu / student: student1@mentorx.edu — all use password123
+        </p>
       </div>
     </div>
   );

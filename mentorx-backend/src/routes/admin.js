@@ -82,9 +82,28 @@ router.get('/students', adminOnly, async (req, res) => {
   }
 });
 
-// POST /api/admin/users — create any user
+// GET /api/admin/parents
+router.get('/parents', adminOnly, async (req, res) => {
+  try {
+    const { rows } = await db.query(`
+      SELECT p.id, u.name, u.email, p.relationship,
+        su.name as student_name, s.id as student_id
+      FROM parents p
+      JOIN users u ON p.user_id = u.id
+      LEFT JOIN students s ON p.student_id = s.id
+      LEFT JOIN users su ON s.user_id = su.id
+      ORDER BY p.id
+    `);
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// POST /api/admin/users — create any user (admin, mentor, mentee, parent)
 router.post('/users', adminOnly, async (req, res) => {
-  const { name, email, password, role, department } = req.body;
+  const { name, email, password, role, department, studentId, relationship } = req.body;
   if (!name || !email || !password || !role)
     return res.status(400).json({ error: 'name, email, password, role required' });
 
@@ -100,6 +119,12 @@ router.post('/users', adminOnly, async (req, res) => {
       await db.query(`INSERT INTO mentors (user_id, department) VALUES ($1,$2)`, [userId, department]);
     } else if (role === 'mentee') {
       await db.query(`INSERT INTO students (user_id, department) VALUES ($1,$2)`, [userId, department]);
+    } else if (role === 'parent') {
+      // studentId links parent to their child's student record
+      await db.query(
+        `INSERT INTO parents (user_id, student_id, relationship) VALUES ($1,$2,$3)`,
+        [userId, studentId || null, relationship || 'Parent']
+      );
     }
 
     res.status(201).json({ message: 'User created', userId });
@@ -127,6 +152,18 @@ router.put('/students/:studentId/assign-mentor', adminOnly, async (req, res) => 
   try {
     await db.query('UPDATE students SET mentor_id = $1 WHERE id = $2', [mentorId, req.params.studentId]);
     res.json({ message: 'Mentor assigned' });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT /api/admin/parents/:parentId/assign-student
+router.put('/parents/:parentId/assign-student', adminOnly, async (req, res) => {
+  const { studentId } = req.body;
+  try {
+    await db.query('UPDATE parents SET student_id = $1 WHERE id = $2', [studentId, req.params.parentId]);
+    res.json({ message: 'Student assigned to parent' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: 'Server error' });

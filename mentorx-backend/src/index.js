@@ -7,6 +7,7 @@ const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const mentorRoutes = require('./routes/mentor');
 const menteeRoutes = require('./routes/mentee');
+const parentRoutes = require('./routes/parent');
 
 const app = express();
 
@@ -31,35 +32,27 @@ app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/mentor', mentorRoutes);
 app.use('/api/mentee', menteeRoutes);
+app.use('/api/parent', parentRoutes);
 
 // Health check
 app.get('/health', (_req, res) => res.json({ status: 'ok', timestamp: new Date().toISOString() }));
 
+// ML Risk Prediction proxy
 app.post("/predict-risk", async (req, res) => {
   try {
-    console.log("➡️ Sending:", req.body);
-
+    console.log("➡️ Sending to ML API:", req.body);
     const response = await fetch("https://supriya202q-ml-work-api.hf.space/predict", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(req.body),
     });
-
-    const text = await response.text();   // 🔥 CHANGE HERE
-    console.log("⬅️ Response from ML:", text);
-
-    const data = JSON.parse(text);        // 🔥 SAFE PARSE
-
+    const text = await response.text();
+    console.log("⬅️ ML Response:", text);
+    const data = JSON.parse(text);
     res.json(data);
-
   } catch (error) {
-    console.error("❌ FULL ERROR:", error);
-    res.status(500).json({
-      error: "ML API failed",
-      details: error.message
-    });
+    console.error("❌ ML API error:", error);
+    res.status(500).json({ error: "ML API failed", details: error.message });
   }
 });
 

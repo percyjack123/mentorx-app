@@ -25,6 +25,9 @@ router.post('/login', async (req, res) => {
     } else if (user.role === 'mentee') {
       const s = await db.query('SELECT id FROM students WHERE user_id = $1', [user.id]);
       roleId = s.rows[0]?.id;
+    } else if (user.role === 'parent') {
+      const p = await db.query('SELECT id FROM parents WHERE user_id = $1', [user.id]);
+      roleId = p.rows[0]?.id;
     }
 
     const token = jwt.sign(
