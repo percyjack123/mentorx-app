@@ -1,38 +1,73 @@
+const express = require('express');
+const router = express.Router();
 const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const db = require('../db');
 
-const auth = (roles = []) => (req, res, next) => {
-  const header = req.headers.authorization;
-
-  if (!header || !header.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Unauthorized' });
-  }
-
-  const token = header.split(' ')[1];
+// 🔐 LOGIN
+router.post('/login', async (req, res) => {
+  console.log("🔥 LOGIN HIT");
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const { email, password } = req.body;
 
-    // ✅ FIX: allow admin without roleId
-    if (!decoded || !decoded.role) {
-      return res.status(401).json({ error: 'Invalid token payload' });
+    const result = await db.query(
+      'SELECT * FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(401).json({ error: 'User not found' });
     }
 
-    if (decoded.role !== 'admin' && !decoded.roleId) {
-      return res.status(401).json({ error: 'Invalid token payload' });
+    const user = result.rows[0];
+
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+
+    if (!isMatch) {
+      return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    req.user = decoded;
+    // roleId logic
+    let roleId = null;
 
-    if (roles.length && !roles.includes(decoded.role)) {
-      return res.status(403).json({ error: 'Forbidden' });
+    if (user.role === 'mentor') {
+      const m = await db.query('SELECT id FROM mentors WHERE user_id = $1', [user.id]);
+      roleId = m.rows[0]?.id;
+    } else if (user.role === 'mentee') {
+      const s = await db.query('SELECT id FROM students WHERE user_id = $1', [user.id]);
+      roleId = s.rows[0]?.id;
+    } else if (user.role === 'parent') {
+      const p = await db.query('SELECT id FROM parents WHERE user_id = $1', [user.id]);
+      roleId = p.rows[0]?.id;
     }
 
-    next();
+    const token = jwt.sign(
+      {
+        id: user.id,
+        role: user.role,
+        roleId
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    return res.json({
+      token,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        roleId
+      }
+    });
 
   } catch (err) {
-    console.error("Auth error:", err.message);
-    return res.status(401).json({ error: 'Invalid or expired token' });
+    console.error("❌ LOGIN ERROR:", err);
+    return res.status(500).json({ error: 'Server error' });
   }
-};
+});
 
-module.exports = auth;
+
+module.exports = router;
