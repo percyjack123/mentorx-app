@@ -33,30 +33,71 @@ app.use('/api/mentor', mentorRoutes);
 app.use('/api/mentee', menteeRoutes);
 app.use('/api/parent', parentRoutes);
 
-// ML route
-app.post("/api/ml/predict", async (req, res) => {
-  try {
-    const response = await fetch("https://supriya202q-ml-work-api.hf.space/predict", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(req.body),
-    });
+// ── ML route ───────────────────────────────────────────────
+const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';
 
-    if (!response.ok) {
-      return res.status(500).json({ error: "ML API failed" });
+/**
+ * POST /api/ml/predict
+ * Body: { cgpa, attendance, mood_score, backlog_count, placement_status }
+ * Returns: { risk, risk_probability, predicted_cgpa, suggestion }
+ */
+app.post('/api/ml/predict', async (req, res) => {
+  try {
+    const {
+      cgpa,
+      attendance,
+      mood_score,
+      backlog_count,
+      placement_status = 'Not Started',
+    } = req.body;
+
+    // Basic validation
+    if (
+      cgpa === undefined ||
+      attendance === undefined ||
+      mood_score === undefined ||
+      backlog_count === undefined
+    ) {
+      return res.status(400).json({
+        error: 'Missing required fields: cgpa, attendance, mood_score, backlog_count',
+      });
     }
 
-    const data = await response.json();
-    res.json(data);
+    const mlRes = await fetch(`${ML_SERVICE_URL}/predict`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cgpa: Number(cgpa),
+        attendance: Number(attendance),
+        mood_score: Number(mood_score),
+        backlog_count: Number(backlog_count),
+        placement_status: String(placement_status),
+      }),
+    });
 
-  } catch (error) {
-    console.error("ML API error:", error);
-    res.status(500).json({ error: "ML service unreachable" });
+    if (!mlRes.ok) {
+      const errText = await mlRes.text().catch(() => 'Unknown error');
+      console.error('ML service error:', mlRes.status, errText);
+      return res.status(502).json({ error: 'ML service returned an error', detail: errText });
+    }
+
+    /** @type {{ risk: string, risk_probability: number, predicted_cgpa: number, suggestion: string }} */
+    const data = await mlRes.json();
+
+    return res.json({
+      risk: data.risk,
+      risk_probability: data.risk_probability,
+      predicted_cgpa: data.predicted_cgpa,
+      suggestion: data.suggestion,
+    });
+
+  } catch (err) {
+    console.error('ML API error:', err);
+    return res.status(503).json({ error: 'ML service unreachable', detail: err.message });
   }
 });
 
+// ── Health ─────────────────────────────────────────────────
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok' });
 });
