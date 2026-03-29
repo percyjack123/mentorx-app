@@ -48,11 +48,11 @@ router.post('/login', async (req, res) => {
 // ── REGISTER (mentee self-registration) ──────────────────
 router.post('/register', async (req, res) => {
   const body = req.body || {};
-  const name = body.name || body.fullName || body.username;
-  const email = body.email || body.user_email || body.emailAddress;
-  const password = body.password || body.pass || body.passwordHash;
-  const role = body.role || body.userRole || 'mentee';
+  const name        = body.name        || body.fullName   || body.username;
+  const email       = body.email       || body.user_email || body.emailAddress;
+  const password    = body.password    || body.pass       || body.passwordHash;
   const mentorEmail = body.mentorEmail || body.mentor_email || body.mentor;
+  const parentEmail = body.parentEmail || body.parent_email || null;
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'name, email, and password are required' });
@@ -62,12 +62,14 @@ router.post('/register', async (req, res) => {
   try {
     await client.query('BEGIN');
 
+    // Check for duplicate email
     const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
     if (existing.rows.length) {
       await client.query('ROLLBACK');
       return res.status(400).json({ error: 'Email already registered' });
     }
 
+    // Create user
     const hash = await bcrypt.hash(password, 10);
     const userRes = await client.query(
       `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'mentee') RETURNING id`,
@@ -75,27 +77,66 @@ router.post('/register', async (req, res) => {
     );
     const userId = userRes.rows[0].id;
 
+    // Create student record
     const studentRes = await client.query(
       `INSERT INTO students (user_id) VALUES ($1) RETURNING id`,
       [userId]
     );
     const studentId = studentRes.rows[0].id;
 
+    // ── MENTOR REQUEST ────────────────────────────────────
     let requestStatus = null;
     if (mentorEmail) {
       const mentorRes = await client.query(
-        `SELECT u.id, m.id AS mentor_id FROM users u JOIN mentors m ON m.user_id = u.id WHERE u.email = $1 AND u.role = 'mentor'`,
+        `SELECT u.id, m.id AS mentor_id
+         FROM users u
+         JOIN mentors m ON m.user_id = u.id
+         WHERE u.email = $1 AND u.role = 'mentor'`,
         [mentorEmail]
       );
       if (!mentorRes.rows.length) {
         requestStatus = 'mentor_not_found';
       } else {
         await client.query(
-          `INSERT INTO mentor_requests (student_id, mentor_id, status) VALUES ($1,$2,'Pending') ON CONFLICT (student_id, mentor_id) DO NOTHING`,
+          `INSERT INTO mentor_requests (student_id, mentor_id, status)
+           VALUES ($1,$2,'Pending')
+           ON CONFLICT (student_id, mentor_id) DO NOTHING`,
           [studentId, mentorRes.rows[0].mentor_id]
         );
         requestStatus = 'pending';
       }
+    }
+
+    // ── PARENT LINKING ────────────────────────────────────
+    // If parentEmail is provided, find the parent record and link this
+    // new student to them by inserting a row into the parents table.
+    // The parents table stores the relationship: parent → student.
+    // Failure to find the parent is silent — it does not block registration.
+    let parentLinkStatus = null;
+    if (parentEmail) {
+      const parentRes = await client.query(
+        `SELECT p.user_id, p.relationship
+         FROM parents p
+         JOIN users u ON u.id = p.user_id
+         WHERE u.email = $1 AND u.role = 'parent'
+         LIMIT 1`,
+        [parentEmail]
+      );
+
+      if (parentRes.rows.length) {
+        const { user_id: parentUserId, relationship } = parentRes.rows[0];
+
+        // Plain VALUES insert — no subquery, no parameter scoping issues.
+        await client.query(
+          `INSERT INTO parents (user_id, student_id, relationship)
+           VALUES ($1, $2, $3)
+           ON CONFLICT DO NOTHING`,
+          [parentUserId, studentId, relationship]
+        );
+
+        parentLinkStatus = 'linked';
+      }
+      // If parent not found: do nothing, no error
     }
 
     await client.query('COMMIT');
@@ -110,6 +151,7 @@ router.post('/register', async (req, res) => {
       token,
       user: { id: userId, name, email, role: 'mentee', roleId: studentId },
       mentorRequestStatus: requestStatus,
+      parentLinkStatus,
     });
   } catch (err) {
     await client.query('ROLLBACK');
