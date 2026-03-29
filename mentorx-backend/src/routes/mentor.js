@@ -575,4 +575,106 @@ router.post('/resources', mentorAuth, async (req, res) => {
   }
 });
 
+// ── MENTOR REQUESTS ───────────────────────────────────────
+// GET /api/mentor/requests
+// Returns: pending mentor requests for this mentor
+router.get('/requests', mentorAuth, async (req, res) => {
+  const mentorId = getMentorId(req);
+  if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
+
+  try {
+    const { rows } = await db.query(
+      `SELECT mr.*, u.name AS student_name, u.email AS student_email
+       FROM mentor_requests mr
+       JOIN students s ON s.id = mr.student_id
+       JOIN users u ON u.id = s.user_id
+       WHERE mr.mentor_id = $1 AND mr.status = 'Pending'
+       ORDER BY mr.created_at ASC`,
+      [mentorId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /mentor/requests:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// PUT /api/mentor/requests/:id/accept
+// Accept a mentor request and assign student to mentor
+router.put('/requests/:id/accept', mentorAuth, async (req, res) => {
+  const mentorId = getMentorId(req);
+  const requestId = Number(req.params.id);
+  if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Verify request belongs to this mentor
+    const requestRes = await client.query(
+      `SELECT * FROM mentor_requests WHERE id = $1 AND mentor_id = $2`,
+      [requestId, mentorId]
+    );
+    if (!requestRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+    const { student_id: studentId } = requestRes.rows[0];
+
+    // Update request status to Accepted
+    await client.query(
+      `UPDATE mentor_requests SET status = 'Accepted' WHERE id = $1`,
+      [requestId]
+    );
+
+    // Assign student to mentor
+    await client.query(
+      `UPDATE students SET mentor_id = $1 WHERE id = $2`,
+      [mentorId, studentId]
+    );
+
+    // Reject all other pending requests for this student
+    await client.query(
+      `UPDATE mentor_requests SET status = 'Rejected'
+       WHERE student_id = $1 AND mentor_id != $2 AND status = 'Pending'`,
+      [studentId, mentorId]
+    );
+
+    await client.query('COMMIT');
+    res.json({ message: 'Request accepted and student assigned' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('PUT /mentor/requests/:id/accept:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// PUT /api/mentor/requests/:id/reject
+// Reject a mentor request
+router.put('/requests/:id/reject', mentorAuth, async (req, res) => {
+  const mentorId = getMentorId(req);
+  const requestId = Number(req.params.id);
+  if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
+
+  try {
+    const requestRes = await db.query(
+      `UPDATE mentor_requests
+       SET status = 'Rejected'
+       WHERE id = $1 AND mentor_id = $2
+       RETURNING *`,
+      [requestId, mentorId]
+    );
+    if (!requestRes.rows.length) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+    res.json({ message: 'Request rejected' });
+  } catch (err) {
+    console.error('PUT /mentor/requests/:id/reject:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 module.exports = router;

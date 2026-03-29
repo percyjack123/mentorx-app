@@ -19,8 +19,18 @@ router.post('/login', async (req, res) => {
 
     let roleId = null;
     if (user.role === 'mentor') {
-      const m = await db.query('SELECT id FROM mentors WHERE user_id = $1', [user.id]);
-      roleId = m.rows[0]?.id;
+      const m = await db.query('SELECT id, status FROM mentors WHERE user_id = $1', [user.id]);
+      if (!m.rows.length) return res.status(403).json({ error: 'Mentor profile not found' });
+      const mentor = m.rows[0];
+      if (mentor.status !== 'Active') {
+        return res.status(403).json({
+          error:
+            mentor.status === 'Pending'
+              ? 'Mentor registration pending admin approval'
+              : 'Mentor registration rejected',
+        });
+      }
+      roleId = mentor.id;
     } else if (user.role === 'mentee') {
       const s = await db.query('SELECT id FROM students WHERE user_id = $1', [user.id]);
       roleId = s.rows[0]?.id;
@@ -51,6 +61,8 @@ router.post('/register', async (req, res) => {
   const name        = body.name        || body.fullName   || body.username;
   const email       = body.email       || body.user_email || body.emailAddress;
   const password    = body.password    || body.pass       || body.passwordHash;
+  const role        = (body.role || 'mentee').toString().toLowerCase();
+  const department  = body.department || null;
   const mentorEmail = body.mentorEmail || body.mentor_email || body.mentor;
   const parentEmail = body.parentEmail || body.parent_email || null;
 
@@ -71,6 +83,27 @@ router.post('/register', async (req, res) => {
 
     // Create user
     const hash = await bcrypt.hash(password, 10);
+
+    if (role === 'mentor') {
+      const userRes = await client.query(
+        `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'mentor') RETURNING id`,
+        [name, email, hash]
+      );
+      const userId = userRes.rows[0].id;
+
+      const mentorRes = await client.query(
+        `INSERT INTO mentors (user_id, department, status) VALUES ($1,$2,'Pending') RETURNING id`,
+        [userId, department]
+      );
+      const mentorId = mentorRes.rows[0].id;
+
+      await client.query('COMMIT');
+      return res.status(201).json({
+        message: 'Mentor registered; awaiting admin approval.',
+        mentor: { id: mentorId, user_id: userId, name, email, status: 'Pending' },
+      });
+    }
+
     const userRes = await client.query(
       `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'mentee') RETURNING id`,
       [name, email, hash]

@@ -28,11 +28,21 @@ router.get('/dashboard', adminOnly, async (req, res) => {
 
 // ── GET MENTORS ───────────────────────────────────────────
 router.get('/mentors', adminOnly, async (req, res) => {
+  const statusFilter = req.query.status ? String(req.query.status) : null;
+  const params = [];
+  let where = '';
+
+  if (statusFilter) {
+    params.push(statusFilter);
+    where = 'WHERE m.status = $1';
+  }
+
   try {
     const { rows } = await db.query(
-      `SELECT m.id, u.name, u.email, m.department,
+      `SELECT m.id, u.name, u.email, m.department, m.status,
          ARRAY(SELECT s.id FROM students s WHERE s.mentor_id = m.id) AS student_ids
-       FROM mentors m JOIN users u ON m.user_id = u.id ORDER BY m.id`
+       FROM mentors m JOIN users u ON m.user_id = u.id ${where} ORDER BY m.id`,
+      params
     );
     res.json(rows);
   } catch (err) {
@@ -131,6 +141,74 @@ router.post('/users', adminOnly, async (req, res) => {
     res.status(201).json({ userId: user.rows[0].id });
   } catch (err) {
     if (err.code === '23505') return res.status(400).json({ error: 'Email exists' });
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── CREATE MENTOR ─────────────────────────────────────────
+router.post('/mentors', adminOnly, async (req, res) => {
+  const { name, email, password, department = null } = req.body;
+  if (!name || !email || !password) return res.status(400).json({ error: 'name, email, and password are required' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const existing = await client.query('SELECT id FROM users WHERE email = $1', [email]);
+    if (existing.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(400).json({ error: 'Email exists' });
+    }
+
+    const hash = await bcrypt.hash(password, 10);
+    const userRes = await client.query(
+      `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'mentor') RETURNING id`,
+      [name, email, hash]
+    );
+    const userId = userRes.rows[0].id;
+
+    const mentorRes = await client.query(
+      `INSERT INTO mentors (user_id, department, status) VALUES ($1,$2,'Pending') RETURNING id`,
+      [userId, department]
+    );
+
+    await client.query('COMMIT');
+    res.status(201).json({ mentorId: mentorRes.rows[0].id, userId });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('POST /admin/mentors:', err);
+    res.status(500).json({ error: 'Server error' });
+  } finally {
+    client.release();
+  }
+});
+
+// ── APPROVE MENTOR ────────────────────────────────────────
+router.put('/mentors/:id/approve', adminOnly, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `UPDATE mentors SET status = 'Active' WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Mentor not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('PUT /admin/mentors/:id/approve:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── REJECT MENTOR ────────────────────────────────────────
+router.put('/mentors/:id/reject', adminOnly, async (req, res) => {
+  try {
+    const { rows } = await db.query(
+      `UPDATE mentors SET status = 'Rejected' WHERE id = $1 RETURNING *`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ error: 'Mentor not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('PUT /admin/mentors/:id/reject:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });

@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS users (
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'mentor', 'mentee')),
+  role VARCHAR(20) NOT NULL CHECK (role IN ('admin', 'mentor', 'mentee', 'parent')),
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -24,7 +24,20 @@ CREATE TABLE IF NOT EXISTS mentors (
   id SERIAL PRIMARY KEY,
   user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
   department VARCHAR(255),
+  status VARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (status IN ('Pending','Active','Rejected')),
   created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =====================
+-- MENTOR REQUESTS
+-- =====================
+CREATE TABLE IF NOT EXISTS mentor_requests (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER,
+  mentor_id INTEGER REFERENCES mentors(id) ON DELETE CASCADE,
+  status VARCHAR(20) DEFAULT 'Pending' CHECK (status IN ('Pending', 'Accepted', 'Rejected')),
+  created_at TIMESTAMP DEFAULT NOW(),
+  UNIQUE(student_id, mentor_id)
 );
 
 -- =====================
@@ -245,6 +258,29 @@ CREATE TABLE IF NOT EXISTS notifications (
   read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- =====================
+-- PASSWORD RESET TOKENS
+-- =====================
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(255) UNIQUE NOT NULL,
+  used BOOLEAN DEFAULT FALSE,
+  expires_at TIMESTAMP NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- =====================
+-- PARENTS TABLE
+-- =====================
+CREATE TABLE IF NOT EXISTS parents (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+  relationship VARCHAR(50),
+  created_at TIMESTAMP DEFAULT NOW()
+);
 CREATE TABLE IF NOT EXISTS checkins (
   id SERIAL PRIMARY KEY,
   student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
@@ -263,3 +299,9 @@ CREATE INDEX IF NOT EXISTS idx_leave_student ON leave_records(student_id);
 CREATE INDEX IF NOT EXISTS idx_documents_student ON documents(student_id);
 CREATE INDEX IF NOT EXISTS idx_goals_student ON goals(student_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id);
+
+-- =====================
+-- ADD FOREIGN KEY CONSTRAINTS
+-- =====================
+ALTER TABLE mentor_requests
+ADD CONSTRAINT fk_mentor_requests_student FOREIGN KEY (student_id) REFERENCES students(id) ON DELETE CASCADE;
