@@ -21,13 +21,289 @@ export const setUser = (u: AuthUser) =>
 export const clearUser = () =>
   localStorage.removeItem('mentorx_user');
 
-// ── Types ──────────────────────────────────────────────────
+// ── Shared Types ───────────────────────────────────────────
+export type UserRole = 'admin' | 'mentor' | 'mentee' | 'parent';
+export type RiskLevel = 'Safe' | 'Moderate' | 'High';
+export type DocumentStatus = 'Clean' | 'Suspicious' | 'Tampered';
+export type LeaveStatus = 'Approved' | 'Pending' | 'Rejected';
+export type PlacementStatus = 'Placed' | 'Preparing' | 'Not Started';
+export type HostelStatus = 'Hosteller' | 'Day Scholar';
+export type SkillType = 'Internship' | 'Hackathon' | 'Certification';
+
 export interface AuthUser {
   id: number;
   name: string;
   email: string;
-  role: 'admin' | 'mentor' | 'mentee' | 'parent';
+  role: UserRole;
   roleId: number | null;
+}
+
+// ── Domain Types ───────────────────────────────────────────
+export interface Student {
+  id: number;
+  user_id: number;
+  mentor_id: number;
+  name: string;
+  email: string;
+  department: string;
+  semester: number;
+  cgpa: number;
+  attendance: number;
+  risk_level: RiskLevel;
+  risk_score: number;
+  mood: string;
+  placement_status: PlacementStatus;
+  hostel_status: HostelStatus;
+  blood_group: string;
+  chronic_conditions: string;
+  insurance_info: string;
+  emergency_contact: string;
+  last_check_in: string | null;
+}
+
+export interface Mentor {
+  id: number;
+  user_id: number;
+  name: string;
+  email: string;
+  department: string;
+  student_ids?: number[];
+}
+
+export interface CheckIn {
+  id: number;
+  student_id: number;
+  mood: number;
+  update_text: string;
+  academic_progress: string;
+  submitted_at: string;
+}
+
+export interface LeaveRecord {
+  id: number;
+  student_id: number;
+  from_date: string;
+  to_date: string;
+  reason: string;
+  status: LeaveStatus;
+  medical_doc_url?: string;
+}
+
+export interface Meeting {
+  id: number;
+  title: string;
+  date: string;
+  time: string;
+  mentor_id: number;
+  mentor_name?: string;
+  meeting_url: string;
+  action_items: string[];
+  student_ids?: number[];
+}
+
+export interface Resource {
+  id: number;
+  title: string;
+  description: string;
+  type: 'link' | 'file';
+  url: string;
+  uploaded_by: number;
+  uploaded_by_name?: string;
+  created_at: string;
+}
+
+export interface Document {
+  id: number;
+  student_id: number;
+  title: string;
+  description?: string;
+  file_url: string;
+  doc_type: string;
+  status: DocumentStatus;
+  suspicion_score: number;
+  uploaded_at: string;
+}
+
+export interface Goal {
+  id: number;
+  student_id: number;
+  mentor_id: number;
+  title: string;
+  description: string;
+  deadline: string;
+  mentor_note: string;
+  progress: number;
+  completed: boolean;
+  tasks?: GoalTask[];
+}
+
+export interface GoalTask {
+  id: number;
+  goal_id: number;
+  title: string;
+  completed: boolean;
+}
+
+export interface SkillEntry {
+  id: number;
+  student_id: number;
+  type: SkillType;
+  title: string;
+  description: string;
+  link: string;
+  entry_date: string;
+}
+
+export interface HealthInfo {
+  id?: number;
+  student_id?: number;
+  blood_group: string;
+  chronic_conditions: string;
+  insurance_info: string;
+  emergency_contacts: Array<{ label: string; value: string }>;
+}
+
+export interface ForumThread {
+  id: number;
+  title: string;
+  content: string;
+  author_id: number;
+  author_name?: string;
+  pinned: boolean;
+  created_at: string;
+  replies?: ForumReply[];
+}
+
+export interface ForumReply {
+  id: number;
+  thread_id: number;
+  author_id: number;
+  author: string;
+  content: string;
+  date: string;
+}
+
+export interface FeedbackEntry {
+  id: number;
+  student_id: number;
+  mentor_id: number;
+  mentor_name?: string;
+  department?: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+}
+
+export interface Notification {
+  id: number;
+  user_id: number;
+  type: string;
+  message: string;
+  read: boolean;
+  created_at: string;
+}
+
+export interface SosAlert {
+  id: number;
+  student_id: number;
+  name?: string;
+  resolved: boolean;
+  created_at: string;
+}
+
+// Dashboard response types
+export interface AdminDashboard {
+  totalStudents: number;
+  totalMentors: number;
+  studentsAtRisk: number;
+  averageCGPA: number;
+}
+
+export interface MentorDashboard {
+  totalMentees: number;
+  highRiskStudents: number;
+  pendingLeaves: number;
+  unsubmittedCheckIns: number;
+}
+
+export interface MenteeDashboard {
+  student: Student;
+  upcomingMeetings: Meeting[];
+  moodTrend: CheckIn[];
+}
+
+export interface ParentDashboard {
+  student: Student | null;
+  studentName: string;
+  riskLevel: RiskLevel;
+  pendingLeaves: number;
+  completedCheckIns: number;
+  recentAlerts: Array<{ type: string; message: string }>;
+}
+
+export interface AnalyticsData {
+  riskDistribution: Array<{ name: string; value: number }>;
+  cgpaTrends: Array<{ semester: string; cgpa: number }>;
+  attendanceDistribution: Array<{ range: string; count: number }>;
+}
+
+export interface MentorAlerts {
+  highRisk: Student[];
+  tamperedDocuments: Array<Document & { name: string }>;
+  missedCheckins: Student[];
+  sosAlerts: SosAlert[];
+}
+
+export interface ParentAlerts {
+  highRisk: Student[];
+  lowAttendance: Student[];
+  missedCheckins: Student[];
+  sosAlerts: SosAlert[];
+}
+
+export interface MenteeProfileData {
+  student: Student;
+  checkIns: CheckIn[];
+  leaveRecords: LeaveRecord[];
+  documents: Document[];
+  goals: Goal[];
+  skillEntries: SkillEntry[];
+  healthInfo?: HealthInfo;
+}
+
+export interface ChildProfileData {
+  student: Student;
+  checkIns: CheckIn[];
+  leaveRecords: LeaveRecord[];
+  documents: Document[];
+  skillEntries: SkillEntry[];
+  healthInfo?: HealthInfo;
+  mentorFeedback?: Array<{ comment: string; mentor_name: string; date: string }>;
+}
+
+export interface MentorStudentsData {
+  mentor: Mentor;
+  students: Student[];
+}
+
+export interface TodayCheckinResponse {
+  submitted: boolean;
+  checkin?: CheckIn;
+}
+
+export interface MlPredictRequest {
+  cgpa: number;
+  attendance: number;
+  mood_score: number;
+  backlog_count: number;
+  placement_status?: PlacementStatus;
+}
+
+export interface MlPredictResponse {
+  risk: 'Green' | 'Yellow' | 'Red';
+  risk_probability: number;
+  predicted_cgpa: number;
+  suggestion: string;
 }
 
 // ── Core request ───────────────────────────────────────────
@@ -55,10 +331,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   }
 
   if (!res.ok) {
-    throw new Error(data?.error || 'Request failed');
+    throw new Error((data as { error?: string })?.error || 'Request failed');
   }
 
-  return data;
+  return data as T;
 }
 
 const get = <T>(path: string) => request<T>(path, { method: 'GET' });
@@ -70,7 +346,7 @@ const del = <T>(path: string) =>
   request<T>(path, { method: 'DELETE' });
 
 // ══════════════════════════════════════════════════════════
-// AUTH
+// AUTH  →  /api/auth/*
 // ══════════════════════════════════════════════════════════
 export const authApi = {
   login: async (email: string, password: string) => {
@@ -89,98 +365,180 @@ export const authApi = {
 };
 
 // ══════════════════════════════════════════════════════════
-// ADMIN
+// ADMIN  →  /api/admin/*
 // ══════════════════════════════════════════════════════════
 export const adminApi = {
-  getDashboard: () => get('/admin/dashboard'),
-  getMentors: () => get('/admin/mentors'),
-  getStudents: () => get('/admin/students'),
-  getMentorStudents: (id: number) => get(`/admin/mentors/${id}/students`),
-  getAnalytics: () => get('/admin/analytics'),
-  getFeedback: () => get('/admin/feedback'),
+  getDashboard: () => get<AdminDashboard>('/admin/dashboard'),
+
+  getMentors: () => get<Mentor[]>('/admin/mentors'),
+
+  getStudents: () => get<Student[]>('/admin/students'),
+
+  getMentorStudents: (id: number) =>
+    get<MentorStudentsData>(`/admin/mentors/${id}/students`),
+
+  getAnalytics: () => get<AnalyticsData>('/admin/analytics'),
+
+  getFeedback: () => get<FeedbackEntry[]>('/admin/feedback'),
+
+  createUser: (data: {
+    name: string;
+    email: string;
+    password: string;
+    role: UserRole;
+  }) => post<{ userId: number }>('/admin/users', data),
+
+  deleteUser: (id: number) => del<{ message: string }>(`/admin/users/${id}`),
 };
 
 // ══════════════════════════════════════════════════════════
-// MENTEE
-// ══════════════════════════════════════════════════════════
-export const menteeApi = {
-  getDashboard: () => get('/mentee/dashboard'),
-  getProfile: () => get('/mentee/profile'),
-
-  getTodayCheckin: () => get('/mentee/checkin/today'),
-  submitCheckin: (data: any) => post('/mentee/checkin', data),
-
-  getResources: () => get('/mentee/resources'),
-  getSkills: () => get('/mentee/skills'),
-  addSkill: (data: any) => post('/mentee/skills', data),
-
-  submitFeedback: (data: any) => post('/mentee/feedback', data),
-  submitConcern: (data: any) => post('/mentee/concern', data),
-
-  getHealth: () => get('/mentee/health'),
-  triggerSOS: () => post('/mentee/sos', {}),
-
-  getDocuments: () => get('/mentee/documents'),
-  uploadDocument: (data: any) => post('/mentee/documents', data),
-  deleteDocument: (id: number) => del(`/mentee/documents/${id}`),
-
-  getNotifications: () => get('/mentee/notifications'),
-};
-
-// ══════════════════════════════════════════════════════════
-// MENTOR
+// MENTOR  →  /api/mentor/*
 // ══════════════════════════════════════════════════════════
 export const mentorApi = {
-  // Dashboard
-  getDashboard: () => get('/mentor/dashboard'),
+  getDashboard: () => get<MentorDashboard>('/mentor/dashboard'),
 
-  // Mentees
-  getMentees: () => get('/mentor/mentees'),
-  getMentee: (id: number) => get(`/mentor/mentees/${id}`),
+  getMentees: () => get<Student[]>('/mentor/mentees'),
 
-  // Alerts
-  getAlerts: () => get('/mentor/alerts'),
+  getMentee: (id: number) => get<MenteeProfileData>(`/mentor/mentees/${id}`),
 
-  // Analytics
-  getAnalytics: () => get('/mentor/analytics'),
+  getAlerts: () => get<MentorAlerts>('/mentor/alerts'),
 
-  // Forum
-  getForumThreads: () => get('/mentor/forum'),
+  getAnalytics: () => get<AnalyticsData>('/mentor/analytics'),
+
+  getForumThreads: () => get<ForumThread[]>('/mentor/forum'),
+
   replyToThread: (threadId: number, message: string) =>
-    post(`/mentor/forum/${threadId}/reply`, { message }),
+    post<ForumReply>(`/mentor/forum/${threadId}/reply`, { message }),
 
-  // Meetings
-  getMeetings: () => get('/mentor/meetings'),
-  createMeeting: (data: any) => post('/mentor/meetings', data),
+  getMeetings: () => get<Meeting[]>('/mentor/meetings'),
 
-  // Leave approvals / actions
-  updateLeaveStatus: (id: number, status: string) =>
-    put(`/mentor/leave/${id}`, { status }),
+  createMeeting: (data: {
+    title: string;
+    date: string;
+    time: string;
+    meetingUrl?: string;
+    studentIds?: number[];
+    actionItems?: string[];
+  }) => post<Meeting>('/mentor/meetings', data),
 
-  // Resources
-  getResources: () => get('/mentor/resources'),
-  createResource: (data: any) => post('/mentor/resources', data),
+  updateLeaveStatus: (id: number, status: LeaveStatus) =>
+    put<LeaveRecord>(`/mentor/leave/${id}`, { status }),
+
+  getResources: () => get<Resource[]>('/mentor/resources'),
+
+  createResource: (data: {
+    title: string;
+    description?: string;
+    type: 'link' | 'file';
+    url?: string;
+  }) => post<Resource>('/mentor/resources', data),
 };
 
 // ══════════════════════════════════════════════════════════
-// PARENT
+// MENTEE  →  /api/mentee/*
+// ══════════════════════════════════════════════════════════
+export const menteeApi = {
+  getDashboard: () => get<MenteeDashboard>('/mentee/dashboard'),
+
+  getProfile: () => get<Student>('/mentee/profile'),
+
+  getTodayCheckin: () => get<TodayCheckinResponse>('/mentee/checkin/today'),
+
+  submitCheckin: (data: {
+    mood: number;
+    update?: string;
+    academicProgress?: string;
+  }) => post<CheckIn>('/mentee/checkin', data),
+
+  getLeaves: () => get<LeaveRecord[]>('/mentee/leaves'),
+
+  applyLeave: (data: {
+    fromDate: string;
+    toDate: string;
+    reason: string;
+    medicalDocUrl?: string;
+  }) => post<LeaveRecord>('/mentee/leaves', data),
+
+  getGoals: () => get<Goal[]>('/mentee/goals'),
+
+  updateTask: (goalId: number, taskId: number, completed: boolean) =>
+    put<Goal>(`/mentee/goals/${goalId}/tasks/${taskId}`, { completed }),
+
+  getResources: () => get<Resource[]>('/mentee/resources'),
+
+  getSkills: () => get<SkillEntry[]>('/mentee/skills'),
+
+  addSkill: (data: {
+    type: SkillType;
+    title: string;
+    description?: string;
+    link?: string;
+    entryDate?: string;
+  }) => post<SkillEntry>('/mentee/skills', data),
+
+  submitFeedback: (data: {
+    rating: number;
+    comment: string;
+  }) => post<FeedbackEntry>('/mentee/feedback', data),
+
+  submitConcern: (data: {
+    content: string;
+    anonymous?: boolean;
+  }) => post<{ id: number }>('/mentee/concern', data),
+
+  getHealth: () => get<HealthInfo>('/mentee/health'),
+
+  updateHealth: (data: {
+    bloodGroup?: string;
+    chronicConditions?: string;
+    insuranceInfo?: string;
+    emergencyContacts?: Array<{ label: string; value: string }>;
+  }) => put<HealthInfo>('/mentee/health', data),
+
+  triggerSOS: () => post<{ id: number }>('/mentee/sos', {}),
+
+  getDocuments: () => get<Document[]>('/mentee/documents'),
+
+  uploadDocument: (data: {
+    title: string;
+    description?: string;
+    fileUrl: string;
+    docType?: string;
+  }) => post<Document>('/mentee/documents', data),
+
+  deleteDocument: (id: number) => del<{ message: string }>(`/mentee/documents/${id}`),
+
+  getNotifications: () => get<Notification[]>('/mentee/notifications'),
+};
+
+// ══════════════════════════════════════════════════════════
+// PARENT  →  /api/parent/*
 // ══════════════════════════════════════════════════════════
 export const parentApi = {
-  getDashboard: () => get('/parent/dashboard'),
-  getChildren: () => get('/parent/children'),
-  getChild: (id: number) => get(`/parent/children/${id}`),
+  getDashboard: () => get<ParentDashboard>('/parent/dashboard'),
 
-  getAnalytics: () => get('/parent/analytics'),
-  getAnnouncements: () => get('/parent/announcements'),
-  getMeetings: () => get('/parent/meetings'),
-  getResources: () => get('/parent/resources'),
+  getChildren: () => get<Student[]>('/parent/children'),
 
-  getNotifications: () => get('/parent/notifications'),
+  getChild: (id: number) => get<ChildProfileData>(`/parent/children/${id}`),
+
+  getAnalytics: () =>
+    get<AnalyticsData & { checkInFrequency?: Array<{ month: string; count: number }> }>(
+      '/parent/analytics'
+    ),
+
+  getAnnouncements: () => get<ForumThread[]>('/parent/announcements'),
+
+  getMeetings: () => get<Meeting[]>('/parent/meetings'),
+
+  getResources: () => get<Resource[]>('/parent/resources'),
+
+  getNotifications: () => get<ParentAlerts>('/parent/notifications'),
 };
 
 // ══════════════════════════════════════════════════════════
-// ML
+// ML  →  /api/ml/*
 // ══════════════════════════════════════════════════════════
 export const mlApi = {
-  predictRisk: (data: any) => post('/ml/predict', data),
+  predictRisk: (data: MlPredictRequest) =>
+    post<MlPredictResponse>('/ml/predict', data),
 };
