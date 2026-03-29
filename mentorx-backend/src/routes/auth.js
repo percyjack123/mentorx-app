@@ -47,7 +47,12 @@ router.post('/login', async (req, res) => {
 
 // ── REGISTER (mentee self-registration) ──────────────────
 router.post('/register', async (req, res) => {
-  const { name, email, password, mentorEmail } = req.body;
+  const body = req.body || {};
+  const name = body.name || body.fullName || body.username;
+  const email = body.email || body.user_email || body.emailAddress;
+  const password = body.password || body.pass || body.passwordHash;
+  const role = body.role || body.userRole || 'mentee';
+  const mentorEmail = body.mentorEmail || body.mentor_email || body.mentor;
 
   if (!name || !email || !password) {
     return res.status(400).json({ error: 'name, email, and password are required' });

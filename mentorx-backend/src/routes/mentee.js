@@ -122,12 +122,13 @@ router.get('/checkin/today', menteeAuth, async (req, res) => {
 // ── SUBMIT CHECK-IN ───────────────────────────────────────
 router.post('/checkin', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
-  const { mood, update, academicProgress } = req.body;
+  const { mood, update } = req.body;
+  const progress = req.body.progress || req.body.academicProgress;
   try {
     const { rows } = await db.query(
       `INSERT INTO check_ins (student_id, mood, update_text, academic_progress)
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [studentId, mood, update || '', academicProgress || '']
+      [studentId, mood, update || '', progress || '']
     );
     // Update student last_check_in
     await db.query(
@@ -153,6 +154,26 @@ router.get('/checkin', menteeAuth, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: 'Server error' });
   }
+});
+
+// ── DOCUMENTS ────────────────────────────────────────────
+router.get('/documents', menteeAuth, async (req, res) => {
+  const studentId = req.user.roleId;
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM documents WHERE student_id = $1 ORDER BY uploaded_at DESC`,
+      [studentId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /mentee/documents:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── NOTIFICATIONS ───────────────────────────────────────
+router.get('/notifications', menteeAuth, async (_req, res) => {
+  res.json([]);
 });
 
 // ── LEAVES ────────────────────────────────────────────────

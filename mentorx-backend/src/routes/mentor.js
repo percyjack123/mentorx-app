@@ -4,6 +4,7 @@ const auth = require('../middleware/auth');
 const db = require('../db');
 
 const menteeAuth = auth(['mentee']);
+const mentorAuth = auth(['mentor', 'admin']);
 
 // ── DASHBOARD ─────────────────────────────────────────────
 router.get('/dashboard', menteeAuth, async (req, res) => {
@@ -381,6 +382,28 @@ router.post('/sos', menteeAuth, async (req, res) => {
     res.json(rows[0]);
   } catch (err) {
     console.error('POST /mentee/sos:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ── MENTEE FULL PROFILE FOR MENTORS ───────────────────────
+router.get('/mentees/:id/profile', mentorAuth, async (req, res) => {
+  const mentorId = req.user.roleId;
+  const studentId = Number(req.params.id);
+
+  try {
+    const { rows } = await db.query(
+      `SELECT s.id, u.name, u.email, s.cgpa, s.attendance, s.department
+       FROM students s
+       JOIN users u ON u.id = s.user_id
+       WHERE s.id = $1 AND s.mentor_id = $2`,
+      [studentId, mentorId]
+    );
+
+    if (!rows.length) return res.status(404).json({ error: 'Not found' });
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('GET /mentor/mentees/:id/profile:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
