@@ -1,18 +1,46 @@
-const router = require('express').Router();
-const db = require('../db');
+const express = require('express');
+const router = express.Router();
 const auth = require('../middleware/auth');
+const db = require('../db');
 
-const menteeAuth = auth(['mentee', 'admin']);
+// ✅ SUBMIT CHECK-IN
+router.post('/checkin', auth(['mentee']), async (req, res) => {
+  try {
+    const studentId = req.user.roleId;
+    const { mood, shortUpdate, academicProgress } = req.body;
 
-router.get('/dashboard', menteeAuth, async (req, res) => {
-  const studentId = req.user.roleId;
+    await db.query(
+      `INSERT INTO check_ins (student_id, mood, update_text, academic_progress)
+       VALUES ($1, $2, $3, $4)`,
+      [studentId, mood, shortUpdate, academicProgress]
+    );
 
-  const { rows } = await db.query(
-    `SELECT * FROM students WHERE id = $1`,
-    [studentId]
-  );
+    res.json({ message: 'Check-in submitted successfully' });
 
-  res.json({ student: rows[0] || null });
+  } catch (err) {
+    console.error("❌ CHECKIN ERROR:", err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ✅ FETCH CHECK-INS
+router.get('/checkin', auth(['mentee']), async (req, res) => {
+  try {
+    const studentId = req.user.roleId;
+
+    const { rows } = await db.query(
+      `SELECT * FROM check_ins
+       WHERE student_id = $1
+       ORDER BY submitted_at DESC`,
+      [studentId]
+    );
+
+    res.json(rows);
+
+  } catch (err) {
+    console.error("❌ FETCH ERROR:", err);
+    res.status(500).json({ error: 'Server error' });
+  }
 });
 
 module.exports = router;

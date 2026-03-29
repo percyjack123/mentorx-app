@@ -245,6 +245,14 @@ CREATE TABLE IF NOT EXISTS notifications (
   read BOOLEAN DEFAULT FALSE,
   created_at TIMESTAMP DEFAULT NOW()
 );
+CREATE TABLE IF NOT EXISTS checkins (
+  id SERIAL PRIMARY KEY,
+  student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,
+  mood VARCHAR(20),
+  update_text TEXT,
+  academic_progress TEXT,
+  created_at TIMESTAMP DEFAULT NOW()
+);
 
 -- =====================
 -- INDEXES
