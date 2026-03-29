@@ -1,21 +1,26 @@
-// src/hooks/use-auth.ts
 import { getUser, clearToken, clearUser } from "@/lib/api";
 import { useNavigate } from "react-router-dom";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-export function useAuth(requiredRole?: "admin" | "mentor" | "mentee") {
+export type UserRole = "admin" | "mentor" | "mentee" | "parent";
+
+export function useAuth(requiredRole?: UserRole) {
   const navigate = useNavigate();
-  const user = getUser();
+  const [user, setUser] = useState(() => getUser());
 
   useEffect(() => {
-    if (!user) {
+    const currentUser = getUser();
+    setUser(currentUser);
+
+    if (!currentUser) {
       navigate("/login");
       return;
     }
-    if (requiredRole && user.role !== requiredRole) {
-      navigate(`/${user.role}`);
+
+    if (requiredRole && currentUser.role !== requiredRole) {
+      navigate(`/${currentUser.role}`);
     }
-  }, []);
+  }, [navigate, requiredRole]);
 
   const logout = () => {
     clearToken();

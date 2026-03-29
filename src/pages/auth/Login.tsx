@@ -7,11 +7,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { GraduationCap, Loader2 } from "lucide-react";
 import { authApi } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
+import type { UserRole } from "@/hooks/use-auth";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("");
+  const [role, setRole] = useState<UserRole | "">("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -32,12 +33,20 @@ export default function Login() {
       }
 
       toast({ title: "Welcome back!", description: `Signed in as ${user.name}` });
-      if (user.role === "admin") navigate("/admin");
-      else if (user.role === "mentor") navigate("/mentor");
-      else if (user.role === "parent") navigate("/parent");
-      else navigate("/mentee");
-    } catch (err: any) {
-      toast({ title: "Login failed", description: err.message || "Invalid credentials", variant: "destructive" });
+
+      // ✅ FIX: All roles explicitly handled
+      const roleRoutes: Record<UserRole, string> = {
+        admin: "/admin",
+        mentor: "/mentor",
+        parent: "/parent",
+        mentee: "/mentee",
+      };
+      navigate(roleRoutes[user.role as UserRole] ?? "/mentee");
+
+    } catch (err) {
+      // ✅ FIX: Removed "catch (err: any)" — proper type narrowing
+      const message = err instanceof Error ? err.message : "Invalid credentials";
+      toast({ title: "Login failed", description: message, variant: "destructive" });
     } finally {
       setLoading(false);
     }
@@ -67,7 +76,7 @@ export default function Login() {
             </div>
             <div className="space-y-2">
               <Label>Role</Label>
-              <Select value={role} onValueChange={setRole} required>
+              <Select value={role} onValueChange={(v) => setRole(v as UserRole)} required>
                 <SelectTrigger><SelectValue placeholder="Select your role" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="admin">Admin</SelectItem>
@@ -90,9 +99,12 @@ export default function Login() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
-          Demo: admin@mentorx.edu / mentor: suresh.menon@mentorx.edu / student: student1@mentorx.edu — all use password123
-        </p>
+        {/* ✅ FIX: Moved demo credentials out of visible UI — security note */}
+        {import.meta.env.DEV && (
+          <p className="text-center text-xs text-muted-foreground mt-6">
+            Demo: admin@mentorx.edu / mentor: suresh.menon@mentorx.edu / student: student1@mentorx.edu — password123
+          </p>
+        )}
       </div>
     </div>
   );

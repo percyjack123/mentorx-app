@@ -7,15 +7,20 @@ import { Button } from "@/components/ui/button";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { AlertTriangle, Lightbulb, ExternalLink, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+// ✅ FIX: Import proper types instead of using "any"
+import type { MenteeProfileData, LeaveRecord, CheckIn, Document, SkillEntry } from "@/types/mentee";
+import type { DocumentStatus } from "@/data/mockData";
 
 export default function MenteeProfile() {
   const { id } = useParams();
-  const [data, setData] = useState<any>(null);
+  // ✅ FIX: Typed state — no more useState<any>
+  const [data, setData] = useState<MenteeProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!id) return;
     mentorApi.getMentee(Number(id))
-      .then(setData)
+      .then((res: MenteeProfileData) => setData(res))
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);
@@ -23,22 +28,33 @@ export default function MenteeProfile() {
   const handleLeaveAction = async (leaveId: number, status: "Approved" | "Rejected") => {
     try {
       await mentorApi.updateLeaveStatus(leaveId, status);
-      setData((prev: any) => ({
-        ...prev,
-        leaveRecords: prev.leaveRecords.map((l: any) => l.id === leaveId ? { ...l, status } : l),
-      }));
+      // ✅ FIX: Typed prev state — no more (prev: any)
+      setData((prev: MenteeProfileData | null) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          leaveRecords: prev.leaveRecords.map((l: LeaveRecord) =>
+            l.id === leaveId ? { ...l, status } : l
+          ),
+        };
+      });
       toast({ title: `Leave ${status}` });
     } catch (err) {
       toast({ title: "Error", description: "Failed to update leave", variant: "destructive" });
     }
   };
 
-  if (loading) return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="animate-spin h-4 w-4" /> Loading...</div>;
+  if (loading) return (
+    <div className="flex items-center gap-2 text-muted-foreground">
+      <Loader2 className="animate-spin h-4 w-4" /> Loading...
+    </div>
+  );
   if (!data) return <p className="text-muted-foreground">Student not found.</p>;
 
   const { student, checkIns, leaveRecords, documents, goals, skillEntries, healthInfo } = data;
 
-  const moodTrendData = checkIns.slice().reverse().map((c: any) => ({
+  // ✅ FIX: Typed map callback — no more (c: any)
+  const moodTrendData = checkIns.slice().reverse().map((c: CheckIn) => ({
     date: new Date(c.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     score: c.mood,
   }));
@@ -55,18 +71,42 @@ export default function MenteeProfile() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-xl border bg-card p-6">
-          <h3 className="font-semibold font-display flex items-center gap-2 mb-2"><AlertTriangle className="h-4 w-4 text-warning" /> Risk Prediction</h3>
+          <h3 className="font-semibold font-display flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-4 w-4 text-warning" /> Risk Prediction
+          </h3>
           <p className="text-3xl font-bold">{student.risk_score}%</p>
           <p className="text-sm text-muted-foreground mt-1">
-            {student.risk_level === "High" ? "Immediate intervention recommended" : student.risk_level === "Moderate" ? "Monitor closely" : "Student is performing well"}
+            {student.risk_level === "High"
+              ? "Immediate intervention recommended"
+              : student.risk_level === "Moderate"
+              ? "Monitor closely"
+              : "Student is performing well"}
           </p>
         </div>
         <div className="rounded-xl border bg-card p-6">
-          <h3 className="font-semibold font-display flex items-center gap-2 mb-2"><Lightbulb className="h-4 w-4 text-warning" /> Intervention Suggestion</h3>
+          <h3 className="font-semibold font-display flex items-center gap-2 mb-2">
+            <Lightbulb className="h-4 w-4 text-warning" /> Intervention Suggestion
+          </h3>
           <ul className="text-sm space-y-1 text-muted-foreground">
-            {student.risk_level === "High" && <><li>• Schedule immediate one-on-one meeting</li><li>• Contact parents/guardians</li><li>• Assign peer buddy</li></>}
-            {student.risk_level === "Moderate" && <><li>• Schedule weekly check-in meetings</li><li>• Set achievable short-term goals</li></>}
-            {student.risk_level === "Safe" && <><li>• Continue regular monitoring</li><li>• Encourage extracurricular activities</li></>}
+            {student.risk_level === "High" && (
+              <>
+                <li>• Schedule immediate one-on-one meeting</li>
+                <li>• Contact parents/guardians</li>
+                <li>• Assign peer buddy</li>
+              </>
+            )}
+            {student.risk_level === "Moderate" && (
+              <>
+                <li>• Schedule weekly check-in meetings</li>
+                <li>• Set achievable short-term goals</li>
+              </>
+            )}
+            {student.risk_level === "Safe" && (
+              <>
+                <li>• Continue regular monitoring</li>
+                <li>• Encourage extracurricular activities</li>
+              </>
+            )}
           </ul>
         </div>
       </div>
@@ -94,7 +134,12 @@ export default function MenteeProfile() {
         <TabsContent value="attendance" className="rounded-xl border bg-card p-6 mt-4">
           <h3 className="font-semibold mb-4">Attendance</h3>
           <div className="w-full bg-muted rounded-full h-4">
-            <div className={`h-4 rounded-full transition-all ${student.attendance >= 75 ? "bg-success" : student.attendance >= 60 ? "bg-warning" : "bg-danger"}`} style={{ width: `${student.attendance}%` }} />
+            <div
+              className={`h-4 rounded-full transition-all ${
+                student.attendance >= 75 ? "bg-success" : student.attendance >= 60 ? "bg-warning" : "bg-danger"
+              }`}
+              style={{ width: `${student.attendance}%` }}
+            />
           </div>
           <p className="text-sm text-muted-foreground mt-2">{student.attendance}% overall attendance</p>
         </TabsContent>
@@ -111,18 +156,21 @@ export default function MenteeProfile() {
                 <Line type="monotone" dataKey="score" stroke="hsl(var(--secondary))" strokeWidth={2} />
               </LineChart>
             </ResponsiveContainer>
-          ) : <p className="text-sm text-muted-foreground">No check-in data yet</p>}
+          ) : (
+            <p className="text-sm text-muted-foreground">No check-in data yet</p>
+          )}
           <p className="text-sm text-muted-foreground mt-2">Current mood: {student.mood}</p>
         </TabsContent>
 
         <TabsContent value="documents" className="rounded-xl border bg-card p-6 mt-4">
           <h3 className="font-semibold mb-4">Documents</h3>
           <div className="space-y-3">
-            {documents.map((doc: any) => (
+            {/* ✅ FIX: Typed doc — no more (doc: any) */}
+            {documents.map((doc: Document) => (
               <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                 <div className="flex items-center gap-3">
                   <span>{doc.title}</span>
-                  <DocBadge status={doc.status} />
+                  <DocBadge status={doc.status as DocumentStatus} />
                 </div>
                 <Button size="sm" variant="outline" onClick={() => window.open(doc.file_url, "_blank")}>
                   <ExternalLink className="h-3 w-3 mr-1" /> Open
@@ -137,9 +185,17 @@ export default function MenteeProfile() {
           <h3 className="font-semibold mb-4">Leave History</h3>
           {leaveRecords.length > 0 ? (
             <table className="w-full text-sm">
-              <thead><tr className="border-b"><th className="text-left py-2">Date</th><th className="text-left py-2">Reason</th><th className="text-left py-2">Status</th><th className="text-left py-2">Actions</th></tr></thead>
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2">Date</th>
+                  <th className="text-left py-2">Reason</th>
+                  <th className="text-left py-2">Status</th>
+                  <th className="text-left py-2">Actions</th>
+                </tr>
+              </thead>
               <tbody>
-                {leaveRecords.map((l: any) => (
+                {/* ✅ FIX: Typed l — no more (l: any) */}
+                {leaveRecords.map((l: LeaveRecord) => (
                   <tr key={l.id} className="border-b last:border-0">
                     <td className="py-2">{l.from_date} to {l.to_date}</td>
                     <td className="py-2">{l.reason}</td>
@@ -150,28 +206,46 @@ export default function MenteeProfile() {
                           <Button size="sm" className="bg-success hover:bg-success/90 text-success-foreground h-7 text-xs" onClick={() => handleLeaveAction(l.id, "Approved")}>Approve</Button>
                           <Button size="sm" variant="destructive" className="h-7 text-xs" onClick={() => handleLeaveAction(l.id, "Rejected")}>Reject</Button>
                         </div>
-                      ) : <span className="text-muted-foreground">-</span>}
+                      ) : (
+                        <span className="text-muted-foreground">-</span>
+                      )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          ) : <p className="text-sm text-muted-foreground">No leave records</p>}
+          ) : (
+            <p className="text-sm text-muted-foreground">No leave records</p>
+          )}
         </TabsContent>
 
         <TabsContent value="health" className="rounded-xl border bg-card p-6 mt-4">
           <h3 className="font-semibold mb-4">Health Info</h3>
           <div className="grid grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg bg-muted/50"><span className="text-xs text-muted-foreground block">Blood Group</span><span className="font-medium">{healthInfo?.blood_group || student.blood_group || "N/A"}</span></div>
-            <div className="p-3 rounded-lg bg-muted/50"><span className="text-xs text-muted-foreground block">Conditions</span><span className="font-medium">{healthInfo?.chronic_conditions || student.chronic_conditions || "None"}</span></div>
-            <div className="p-3 rounded-lg bg-muted/50"><span className="text-xs text-muted-foreground block">Emergency Contact</span><span className="font-medium">{student.emergency_contact || "N/A"}</span></div>
-            <div className="p-3 rounded-lg bg-muted/50"><span className="text-xs text-muted-foreground block">Status</span><span className="font-medium">{student.hostel_status}</span></div>
+            {/* ✅ FIX: Optional chaining already correct here — healthInfo typed now */}
+            <div className="p-3 rounded-lg bg-muted/50">
+              <span className="text-xs text-muted-foreground block">Blood Group</span>
+              <span className="font-medium">{healthInfo?.blood_group ?? student.blood_group ?? "N/A"}</span>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <span className="text-xs text-muted-foreground block">Conditions</span>
+              <span className="font-medium">{healthInfo?.chronic_conditions ?? student.chronic_conditions ?? "None"}</span>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <span className="text-xs text-muted-foreground block">Emergency Contact</span>
+              <span className="font-medium">{student.emergency_contact ?? "N/A"}</span>
+            </div>
+            <div className="p-3 rounded-lg bg-muted/50">
+              <span className="text-xs text-muted-foreground block">Status</span>
+              <span className="font-medium">{student.hostel_status ?? "N/A"}</span>
+            </div>
           </div>
         </TabsContent>
 
         <TabsContent value="skills" className="rounded-xl border bg-card p-6 mt-4">
           <h3 className="font-semibold mb-4">Skill Log</h3>
-          {skillEntries.map((entry: any) => (
+          {/* ✅ FIX: Typed entry — no more (entry: any) */}
+          {skillEntries.map((entry: SkillEntry) => (
             <div key={entry.id} className="p-3 rounded-lg bg-muted/50 mb-2">
               <div className="flex items-center justify-between">
                 <span className="font-medium text-sm">{entry.title}</span>

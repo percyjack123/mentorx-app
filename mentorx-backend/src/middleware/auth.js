@@ -2,18 +2,37 @@ const jwt = require('jsonwebtoken');
 
 const auth = (roles = []) => (req, res, next) => {
   const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer '))
+
+  if (!header || !header.startsWith('Bearer ')) {
     return res.status(401).json({ error: 'Unauthorized' });
+  }
 
   const token = header.split(' ')[1];
+
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // ✅ FIXED LOGIC
+    if (!decoded || !decoded.role) {
+      return res.status(401).json({ error: 'Invalid token payload' });
+    }
+
+    // ❗ Only check roleId for NON-admin users
+    if (decoded.role !== 'admin' && !decoded.roleId) {
+      return res.status(401).json({ error: 'Invalid token payload' });
+    }
+
     req.user = decoded;
-    if (roles.length && !roles.includes(decoded.role))
+
+    if (roles.length && !roles.includes(decoded.role)) {
       return res.status(403).json({ error: 'Forbidden' });
+    }
+
     next();
-  } catch {
-    res.status(401).json({ error: 'Invalid token' });
+
+  } catch (err) {
+    console.error("Auth error:", err.message);
+    return res.status(401).json({ error: 'Invalid or expired token' });
   }
 };
 

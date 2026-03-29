@@ -5,6 +5,7 @@ import {
 } from "@/components/ui/sidebar";
 import { LayoutDashboard, Users, GraduationCap, BarChart3, MessageSquare } from "lucide-react";
 import { Navbar } from "@/components/Navbar";
+import { useAuth } from "@/hooks/use-auth";
 
 const items = [
   { title: "Dashboard", url: "/admin", icon: LayoutDashboard },
@@ -29,17 +30,24 @@ function AdminSidebar() {
     <Sidebar collapsible="icon">
       <SidebarContent>
         <div className="p-4">
-          {!collapsed && <h2 className="text-lg font-bold font-display gradient-text">MentorX</h2>}
-          {collapsed && <h2 className="text-lg font-bold font-display gradient-text text-center">M</h2>}
+          {!collapsed && <h2 className="text-lg font-bold gradient-text">MentorX</h2>}
+          {collapsed && <h2 className="text-lg font-bold text-center">M</h2>}
           {!collapsed && <p className="text-xs text-muted-foreground">Admin Panel</p>}
         </div>
+
         <SidebarGroup>
           <SidebarGroupLabel>Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton isActive={location.pathname === item.url} onClick={() => handleNavigation(item.url)}>
+                  <SidebarMenuButton
+                    isActive={
+                      location.pathname === item.url ||
+                      location.pathname.startsWith(item.url + "/")
+                    }
+                    onClick={() => handleNavigation(item.url)}
+                  >
                     <item.icon className="h-4 w-4" />
                     {!collapsed && <span>{item.title}</span>}
                   </SidebarMenuButton>
@@ -48,21 +56,26 @@ function AdminSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
       </SidebarContent>
     </Sidebar>
   );
 }
 
 export default function AdminLayout() {
+  useAuth("admin"); // ✅ CRITICAL FIX
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
         <AdminSidebar />
+
         <div className="flex-1 flex flex-col">
-          <header className="h-14 flex items-center gap-4 border-b border-border bg-card px-6">
+          <header className="h-14 flex items-center gap-4 border-b bg-card px-6">
             <SidebarTrigger />
             <Navbar role="admin" title="Admin Dashboard" />
           </header>
+
           <main className="flex-1 overflow-auto p-6">
             <Outlet />
           </main>
