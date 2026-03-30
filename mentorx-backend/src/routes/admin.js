@@ -11,7 +11,7 @@ async function createNotification(userId, type, message) {
       `INSERT INTO notifications (user_id, type, message) VALUES ($1, $2, $3)`,
       [userId, type, message]
     );
-  } catch (_) { /* non-critical */ }
+  } catch (_) {}
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
@@ -19,7 +19,7 @@ router.get('/dashboard', adminOnly, async (req, res) => {
   try {
     const [students, mentors, risk, cgpa] = await Promise.all([
       db.query('SELECT COUNT(*) FROM students'),
-      db.query('SELECT COUNT(*) FROM mentors'),
+      db.query('SELECT COUNT(*) FROM mentors WHERE status = $1', ['Active']),
       db.query(`SELECT COUNT(*) FROM students WHERE risk_level != 'Safe'`),
       db.query('SELECT AVG(cgpa) FROM students'),
     ]);
@@ -55,27 +55,6 @@ router.get('/mentors', adminOnly, async (req, res) => {
   }
 });
 
-// ── MENTOR + STUDENTS ─────────────────────────────────────
-router.get('/mentors/:id/students', adminOnly, async (req, res) => {
-  try {
-    const mentorRes = await db.query(
-      `SELECT m.id, u.name, u.email, m.department, m.status
-       FROM mentors m JOIN users u ON m.user_id = u.id WHERE m.id = $1`,
-      [req.params.id]
-    );
-    if (!mentorRes.rows.length) return res.status(404).json({ error: 'Mentor not found' });
-    const studentsRes = await db.query(
-      `SELECT s.*, u.name, u.email FROM students s
-       JOIN users u ON s.user_id = u.id WHERE s.mentor_id = $1 ORDER BY u.name`,
-      [req.params.id]
-    );
-    res.json({ mentor: mentorRes.rows[0], students: studentsRes.rows });
-  } catch (err) {
-    console.error('GET /admin/mentors/:id/students:', err);
-    res.status(500).json({ error: 'Server error', detail: err.message });
-  }
-});
-
 // ── PENDING MENTOR APPROVALS ──────────────────────────────
 router.get('/mentors/pending', adminOnly, async (req, res) => {
   try {
@@ -99,9 +78,8 @@ router.put('/mentors/:id/approve', adminOnly, async (req, res) => {
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Mentor not found' });
-
-    await createNotification(rows[0].user_id, 'system', 'Your mentor registration has been approved. You can now log in.');
-
+    await createNotification(rows[0].user_id, 'system',
+      'Your mentor registration has been approved. You can now log in.');
     res.json(rows[0]);
   } catch (err) {
     console.error('PUT /admin/mentors/:id/approve:', err);
@@ -117,12 +95,32 @@ router.put('/mentors/:id/reject', adminOnly, async (req, res) => {
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Mentor not found' });
-
-    await createNotification(rows[0].user_id, 'system', 'Your mentor registration was not approved.');
-
+    await createNotification(rows[0].user_id, 'system',
+      'Your mentor registration was not approved.');
     res.json(rows[0]);
   } catch (err) {
     console.error('PUT /admin/mentors/:id/reject:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  }
+});
+
+// ── MENTOR + STUDENTS ─────────────────────────────────────
+router.get('/mentors/:id/students', adminOnly, async (req, res) => {
+  try {
+    const mentorRes = await db.query(
+      `SELECT m.id, u.name, u.email, m.department, m.status
+       FROM mentors m JOIN users u ON m.user_id = u.id WHERE m.id = $1`,
+      [req.params.id]
+    );
+    if (!mentorRes.rows.length) return res.status(404).json({ error: 'Mentor not found' });
+    const studentsRes = await db.query(
+      `SELECT s.*, u.name, u.email FROM students s
+       JOIN users u ON s.user_id = u.id WHERE s.mentor_id = $1 ORDER BY u.name`,
+      [req.params.id]
+    );
+    res.json({ mentor: mentorRes.rows[0], students: studentsRes.rows });
+  } catch (err) {
+    console.error('GET /admin/mentors/:id/students:', err);
     res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
@@ -160,7 +158,7 @@ router.get('/analytics', adminOnly, async (req, res) => {
             ELSE '<60%'
           END AS range,
           COUNT(*) AS count
-        FROM students GROUP BY range`),
+        FROM students GROUP BY range ORDER BY range`),
     ]);
     res.json({
       riskDistribution: riskDist.rows.map(r => ({ name: r.name, value: parseInt(r.value) })),
@@ -173,7 +171,7 @@ router.get('/analytics', adminOnly, async (req, res) => {
   }
 });
 
-// ── FEEDBACK (from DB only) ───────────────────────────────
+// ── FEEDBACK ──────────────────────────────────────────────
 router.get('/feedback', adminOnly, async (req, res) => {
   try {
     const { rows } = await db.query(
@@ -208,7 +206,8 @@ router.get('/notifications', adminOnly, async (req, res) => {
 // ── CREATE USER ───────────────────────────────────────────
 router.post('/users', adminOnly, async (req, res) => {
   const { name, email, password, role } = req.body;
-  if (!name || !email || !password || !role) return res.status(400).json({ error: 'Missing fields' });
+  if (!name || !email || !password || !role)
+    return res.status(400).json({ error: 'Missing fields' });
   try {
     const hash = await bcrypt.hash(password, 10);
     const user = await db.query(
@@ -226,7 +225,8 @@ router.post('/users', adminOnly, async (req, res) => {
 // ── CREATE MENTOR (admin-initiated) ──────────────────────
 router.post('/mentors', adminOnly, async (req, res) => {
   const { name, email, password, department = null } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ error: 'name, email, password required' });
+  if (!name || !email || !password)
+    return res.status(400).json({ error: 'name, email, password required' });
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');

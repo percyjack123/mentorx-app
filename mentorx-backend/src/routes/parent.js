@@ -45,20 +45,15 @@ router.get('/dashboard', parentAuth, async (req, res) => {
 
     const students = studentsRes.rows;
     const first = students[0];
-    const totalChildren = students.length;
-    const avgCgpa = students.length
-      ? parseFloat((students.reduce((s, x) => s + parseFloat(x.cgpa || 0), 0) / students.length).toFixed(2))
-      : 0;
-    const avgAttendance = students.length
-      ? Math.round(students.reduce((s, x) => s + parseInt(x.attendance || 0), 0) / students.length)
-      : 0;
 
     const recentAlerts = [];
-    if (first?.risk_level === 'High') recentAlerts.push({ type: 'danger', message: `${first.name} is at High risk` });
-    if (first?.attendance < 75) recentAlerts.push({ type: 'warning', message: `Attendance is ${first.attendance}% (below 75%)` });
+    if (first?.risk_level === 'High')
+      recentAlerts.push({ type: 'danger', message: `${first.name} is at High risk` });
+    if (first?.attendance < 75)
+      recentAlerts.push({ type: 'warning', message: `Attendance is ${first.attendance}% (below 75%)` });
 
     res.json({
-      totalChildren, avgCgpa, avgAttendance,
+      totalChildren:     students.length,
       studentName:       first?.name || '—',
       riskLevel:         first?.risk_level || 'Safe',
       pendingLeaves:     parseInt(leavesRes.rows[0].count),
@@ -228,7 +223,7 @@ router.get('/resources', parentAuth, async (req, res) => {
   }
 });
 
-// ── ANNOUNCEMENTS (pinned forum threads) ──────────────────
+// ── ANNOUNCEMENTS ─────────────────────────────────────────
 router.get('/announcements', parentAuth, async (req, res) => {
   try {
     const threadsRes = await db.query(
@@ -264,11 +259,13 @@ router.get('/analytics', parentAuth, async (req, res) => {
 
     const [riskRes, cgpaRes, attendanceRes, checkInRes] = await Promise.all([
       db.query(
-        `SELECT risk_level AS name, COUNT(*) AS value FROM students WHERE id = ANY($1::int[]) GROUP BY risk_level`,
+        `SELECT risk_level AS name, COUNT(*) AS value
+         FROM students WHERE id = ANY($1::int[]) GROUP BY risk_level`,
         [studentIds]
       ),
       db.query(
-        `SELECT semester, ROUND(AVG(cgpa)::numeric,2) AS cgpa FROM students WHERE id = ANY($1::int[]) GROUP BY semester ORDER BY semester`,
+        `SELECT semester, ROUND(AVG(cgpa)::numeric,2) AS cgpa
+         FROM students WHERE id = ANY($1::int[]) GROUP BY semester ORDER BY semester`,
         [studentIds]
       ),
       db.query(

@@ -17,7 +17,7 @@ async function createNotification(userId, type, message) {
       `INSERT INTO notifications (user_id, type, message) VALUES ($1, $2, $3)`,
       [userId, type, message]
     );
-  } catch (_) { /* non-critical */ }
+  } catch (_) {}
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
@@ -25,7 +25,7 @@ router.get('/dashboard', mentorAuth, async (req, res) => {
   const mentorId = getMentorId(req);
   if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
   try {
-    const [totalRes, highRiskRes, pendingLeavesRes, unsubmittedRes] = await Promise.all([
+    const [totalRes, highRiskRes, pendingLeavesRes, unsubmittedRes, pendingRequestsRes] = await Promise.all([
       db.query(`SELECT COUNT(*) FROM students WHERE mentor_id = $1`, [mentorId]),
       db.query(`SELECT COUNT(*) FROM students WHERE mentor_id = $1 AND risk_level = 'High'`, [mentorId]),
       db.query(
@@ -40,12 +40,18 @@ router.get('/dashboard', mentorAuth, async (req, res) => {
            AND (last_check_in IS NULL OR last_check_in < CURRENT_DATE)`,
         [mentorId]
       ),
+      db.query(
+        `SELECT COUNT(*) FROM mentor_requests
+         WHERE mentor_id = $1 AND status = 'Pending'`,
+        [mentorId]
+      ),
     ]);
     res.json({
       totalMentees:        parseInt(totalRes.rows[0].count),
       highRiskStudents:    parseInt(highRiskRes.rows[0].count),
       pendingLeaves:       parseInt(pendingLeavesRes.rows[0].count),
       unsubmittedCheckIns: parseInt(unsubmittedRes.rows[0].count),
+      pendingRequests:     parseInt(pendingRequestsRes.rows[0].count),
     });
   } catch (err) {
     console.error('GET /mentor/dashboard:', err);
@@ -139,7 +145,7 @@ router.get('/mentees/:id', mentorAuth, async (req, res) => {
   }
 });
 
-// ── MENTEE CHECK-INS (standalone) ────────────────────────
+// ── MENTEE CHECK-INS ─────────────────────────────────────
 router.get('/mentees/:id/checkins', mentorAuth, async (req, res) => {
   const mentorId = getMentorId(req);
   const studentId = Number(req.params.id);
@@ -163,7 +169,7 @@ router.get('/mentees/:id/checkins', mentorAuth, async (req, res) => {
   }
 });
 
-// ── MENTEE LEAVES (standalone) ────────────────────────────
+// ── MENTEE LEAVES ─────────────────────────────────────────
 router.get('/mentees/:id/leaves', mentorAuth, async (req, res) => {
   const mentorId = getMentorId(req);
   const studentId = Number(req.params.id);
@@ -217,7 +223,6 @@ router.post('/mentees/:id/goals', mentorAuth, async (req, res) => {
       }
       await client.query('COMMIT');
 
-      // Notify student
       const studentUserRes = await db.query(`SELECT user_id FROM students WHERE id = $1`, [studentId]);
       if (studentUserRes.rows.length) {
         await createNotification(studentUserRes.rows[0].user_id, 'goal', `New goal assigned: ${title}`);
@@ -289,9 +294,8 @@ router.put('/leave/:id', mentorAuth, async (req, res) => {
   const leaveId = Number(req.params.id);
   const { status } = req.body;
   if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
-  if (!['Approved', 'Rejected'].includes(status)) {
+  if (!['Approved', 'Rejected'].includes(status))
     return res.status(400).json({ error: "status must be 'Approved' or 'Rejected'" });
-  }
   try {
     const ownerCheck = await db.query(
       `SELECT lr.id, lr.student_id FROM leave_records lr
@@ -307,7 +311,6 @@ router.put('/leave/:id', mentorAuth, async (req, res) => {
       [status, mentorId, leaveId]
     );
 
-    // Notify student
     const studentId = ownerCheck.rows[0].student_id;
     const studentUserRes = await db.query(`SELECT user_id FROM students WHERE id = $1`, [studentId]);
     if (studentUserRes.rows.length) {
@@ -340,6 +343,19 @@ router.get('/notifications', mentorAuth, async (req, res) => {
   }
 });
 
+router.put('/notifications/:id/read', mentorAuth, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    await db.query(
+      `UPDATE notifications SET read = TRUE WHERE id = $1 AND user_id = $2`,
+      [req.params.id, userId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.json({ ok: false });
+  }
+});
+
 // ── ANALYTICS ─────────────────────────────────────────────
 router.get('/analytics', mentorAuth, async (req, res) => {
   const mentorId = getMentorId(req);
@@ -351,7 +367,8 @@ router.get('/analytics', mentorAuth, async (req, res) => {
         [mentorId]
       ),
       db.query(
-        `SELECT semester, ROUND(AVG(cgpa)::numeric,2) AS cgpa FROM students WHERE mentor_id = $1 GROUP BY semester ORDER BY semester`,
+        `SELECT semester, ROUND(AVG(cgpa)::numeric,2) AS cgpa
+         FROM students WHERE mentor_id = $1 GROUP BY semester ORDER BY semester`,
         [mentorId]
       ),
       db.query(
@@ -448,7 +465,8 @@ router.post('/meetings', mentorAuth, async (req, res) => {
   const mentorId = getMentorId(req);
   if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
   const { title, date, time, meetingUrl = null, studentIds = [], actionItems = [] } = req.body;
-  if (!title || !date || !time) return res.status(400).json({ error: 'title, date and time are required' });
+  if (!title || !date || !time)
+    return res.status(400).json({ error: 'title, date and time are required' });
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -503,7 +521,8 @@ router.post('/resources', mentorAuth, async (req, res) => {
   const uploadedBy = req.user.id;
   const { title, description = null, type = 'link', url = null } = req.body;
   if (!title) return res.status(400).json({ error: 'title is required' });
-  if (!['link', 'file'].includes(type)) return res.status(400).json({ error: "type must be 'link' or 'file'" });
+  if (!['link', 'file'].includes(type))
+    return res.status(400).json({ error: "type must be 'link' or 'file'" });
   try {
     const { rows } = await db.query(
       `INSERT INTO resources (title, description, type, url, uploaded_by)
@@ -518,27 +537,14 @@ router.post('/resources', mentorAuth, async (req, res) => {
   }
 });
 
-// ── MARK NOTIFICATION READ ────────────────────────────────
-router.put('/notifications/:id/read', mentorAuth, async (req, res) => {
-  const userId = req.user.id;
-  try {
-    await db.query(
-      `UPDATE notifications SET read = TRUE WHERE id = $1 AND user_id = $2`,
-      [req.params.id, userId]
-    );
-    res.json({ ok: true });
-  } catch (err) {
-    res.json({ ok: false });
-  }
-});
-
 // ── MENTOR REQUESTS ───────────────────────────────────────
 router.get('/requests', mentorAuth, async (req, res) => {
   const mentorId = getMentorId(req);
   if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
   try {
     const { rows } = await db.query(
-      `SELECT mr.*, u.name AS student_name, u.email AS student_email
+      `SELECT mr.*, u.name AS student_name, u.email AS student_email,
+              s.department, s.semester
        FROM mentor_requests mr
        JOIN students s ON s.id = mr.student_id
        JOIN users u ON u.id = s.user_id
@@ -578,10 +584,10 @@ router.put('/requests/:id/accept', mentorAuth, async (req, res) => {
     );
     await client.query('COMMIT');
 
-    // Notify student
     const studentUserRes = await db.query(`SELECT user_id FROM students WHERE id = $1`, [studentId]);
     if (studentUserRes.rows.length) {
-      await createNotification(studentUserRes.rows[0].user_id, 'mentor_request', 'Your mentor request was accepted');
+      await createNotification(studentUserRes.rows[0].user_id, 'mentor_request',
+        'Your mentor request was accepted');
     }
 
     res.json({ message: 'Request accepted and student assigned' });
@@ -600,16 +606,17 @@ router.put('/requests/:id/reject', mentorAuth, async (req, res) => {
   if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
   try {
     const requestRes = await db.query(
-      `UPDATE mentor_requests SET status = 'Rejected' WHERE id = $1 AND mentor_id = $2 RETURNING *`,
+      `UPDATE mentor_requests SET status = 'Rejected'
+       WHERE id = $1 AND mentor_id = $2 RETURNING *`,
       [requestId, mentorId]
     );
     if (!requestRes.rows.length) return res.status(404).json({ error: 'Request not found' });
 
-    // Notify student
     const studentId = requestRes.rows[0].student_id;
     const studentUserRes = await db.query(`SELECT user_id FROM students WHERE id = $1`, [studentId]);
     if (studentUserRes.rows.length) {
-      await createNotification(studentUserRes.rows[0].user_id, 'mentor_request', 'Your mentor request was rejected');
+      await createNotification(studentUserRes.rows[0].user_id, 'mentor_request',
+        'Your mentor request was rejected');
     }
 
     res.json({ message: 'Request rejected' });

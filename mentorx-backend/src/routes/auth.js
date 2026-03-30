@@ -11,7 +11,7 @@ async function createNotification(userId, type, message) {
       `INSERT INTO notifications (user_id, type, message) VALUES ($1, $2, $3)`,
       [userId, type, message]
     );
-  } catch (_) { /* non-critical */ }
+  } catch (_) {}
 }
 
 // ── LOGIN ─────────────────────────────────────────────────
@@ -21,7 +21,7 @@ router.post('/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ error: 'email and password are required' });
 
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (!result.rows.length) return res.status(401).json({ error: 'User not found' });
+    if (!result.rows.length) return res.status(401).json({ error: 'Invalid credentials' });
 
     const user = result.rows[0];
     const isMatch = await bcrypt.compare(password, user.password_hash);
@@ -33,10 +33,9 @@ router.post('/login', async (req, res) => {
       const m = await db.query('SELECT * FROM mentors WHERE user_id = $1', [user.id]);
       if (!m.rows.length) return res.status(403).json({ error: 'Mentor profile not found' });
       const mentor = m.rows[0];
-      const status = mentor.status;
-      if (status && status !== 'Active') {
+      if (mentor.status && mentor.status !== 'Active') {
         return res.status(403).json({
-          error: status === 'Pending'
+          error: mentor.status === 'Pending'
             ? 'Mentor registration pending admin approval'
             : 'Mentor registration rejected',
         });
@@ -49,7 +48,6 @@ router.post('/login', async (req, res) => {
       const p = await db.query('SELECT id FROM parents WHERE user_id = $1', [user.id]);
       roleId = p.rows[0]?.id || null;
     }
-    // admin: roleId stays null
 
     const token = jwt.sign(
       { id: user.id, role: user.role, roleId },
@@ -68,22 +66,20 @@ router.post('/login', async (req, res) => {
 });
 
 // ── REGISTER ──────────────────────────────────────────────
-// Supports role: 'mentee' (default) and 'mentor' (goes to Pending)
 router.post('/register', async (req, res) => {
   const body = req.body || {};
-  const name        = body.name || body.fullName;
-  const email       = body.email;
-  const password    = body.password;
-  const role        = (body.role || 'mentee').toString().toLowerCase();
-  const department  = body.department || null;
+  const name       = body.name || body.fullName;
+  const email      = body.email;
+  const password   = body.password;
+  const role       = (body.role || 'mentee').toString().toLowerCase();
+  const department = body.department || null;
+  const semester   = body.semester ? parseInt(body.semester) : 1;
   const mentorEmail = body.mentorEmail || body.mentor_email || null;
 
-  if (!name || !email || !password) {
+  if (!name || !email || !password)
     return res.status(400).json({ error: 'name, email, and password are required' });
-  }
-  if (!['mentee', 'mentor'].includes(role)) {
+  if (!['mentee', 'mentor'].includes(role))
     return res.status(400).json({ error: 'role must be mentee or mentor' });
-  }
 
   const client = await db.pool.connect();
   try {
@@ -97,7 +93,7 @@ router.post('/register', async (req, res) => {
 
     const hash = await bcrypt.hash(password, 10);
 
-    // ── MENTOR registration → Pending status ──
+    // ── MENTOR registration → Pending ──
     if (role === 'mentor') {
       const userRes = await client.query(
         `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'mentor') RETURNING id`,
@@ -109,15 +105,15 @@ router.post('/register', async (req, res) => {
         [userId, department]
       );
 
-      // Notify all admins of new mentor registration
       const admins = await client.query(`SELECT id FROM users WHERE role = 'admin'`);
       for (const admin of admins.rows) {
-        await createNotification(admin.id, 'mentor_registration', `New mentor registration: ${name} (${email}) — pending approval`);
+        await createNotification(admin.id, 'mentor_registration',
+          `New mentor registration: ${name} (${email}) — pending approval`);
       }
 
       await client.query('COMMIT');
       return res.status(201).json({
-        message: 'Mentor registered. Awaiting admin approval before you can log in.',
+        message: 'Mentor registered. Awaiting admin approval.',
         mentor: { id: mentorRes.rows[0].id, user_id: userId, name, email, status: 'Pending' },
       });
     }
@@ -129,12 +125,11 @@ router.post('/register', async (req, res) => {
     );
     const userId = userRes.rows[0].id;
     const studentRes = await client.query(
-      `INSERT INTO students (user_id) VALUES ($1) RETURNING id`,
-      [userId]
+      `INSERT INTO students (user_id, department, semester) VALUES ($1,$2,$3) RETURNING id`,
+      [userId, department, semester]
     );
     const studentId = studentRes.rows[0].id;
 
-    // Optional: send mentor request
     let requestStatus = null;
     if (mentorEmail) {
       const mentorRes = await client.query(
@@ -151,7 +146,6 @@ router.post('/register', async (req, res) => {
            VALUES ($1,$2,'Pending') ON CONFLICT (student_id, mentor_id) DO NOTHING`,
           [studentId, mentorRes.rows[0].mentor_id]
         );
-        // Notify mentor of request
         await createNotification(
           mentorRes.rows[0].mentor_user_id,
           'mentor_request',
@@ -202,22 +196,19 @@ router.get('/me', async (req, res) => {
 });
 
 // ── FORGOT PASSWORD ───────────────────────────────────────
-// Returns resetToken in dev mode for testing (no email required)
 router.post('/forgot-password', async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'email is required' });
   try {
     const result = await db.query('SELECT id FROM users WHERE email = $1', [email]);
     if (!result.rows.length) {
-      // Always return success to prevent email enumeration
       return res.json({ message: 'If that email exists, a reset link has been sent.' });
     }
 
     const userId = result.rows[0].id;
     const token = crypto.randomBytes(32).toString('hex');
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000);
 
-    // Invalidate old tokens
     await db.query(
       `UPDATE password_reset_tokens SET used = TRUE WHERE user_id = $1 AND used = FALSE`,
       [userId]
@@ -230,7 +221,7 @@ router.post('/forgot-password', async (req, res) => {
     const isDev = process.env.NODE_ENV !== 'production';
     return res.json({
       message: 'If that email exists, a reset link has been sent.',
-      ...(isDev && { resetToken: token, note: 'resetToken is only shown in development mode' }),
+      ...(isDev && { resetToken: token, note: 'Only shown in development' }),
     });
   } catch (err) {
     console.error('FORGOT PASSWORD ERROR:', err);

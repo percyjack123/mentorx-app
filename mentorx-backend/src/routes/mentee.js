@@ -5,14 +5,13 @@ const db = require('../db');
 
 const menteeAuth = auth(['mentee']);
 
-// ── HELPERS ───────────────────────────────────────────────
 async function createNotification(userId, type, message) {
   try {
     await db.query(
       `INSERT INTO notifications (user_id, type, message) VALUES ($1, $2, $3)`,
       [userId, type, message]
     );
-  } catch (_) { /* non-critical */ }
+  } catch (_) {}
 }
 
 // ── DASHBOARD ─────────────────────────────────────────────
@@ -183,11 +182,10 @@ router.get('/notifications', menteeAuth, async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('GET /mentee/notifications:', err);
-    res.json([]); // non-critical, return empty
+    res.json([]);
   }
 });
 
-// ── MARK NOTIFICATION READ ────────────────────────────────
 router.put('/notifications/:id/read', menteeAuth, async (req, res) => {
   const userId = req.user.id;
   try {
@@ -219,9 +217,8 @@ router.get('/leaves', menteeAuth, async (req, res) => {
 router.post('/leaves', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   const { fromDate, toDate, reason, medicalDocUrl } = req.body;
-  if (!fromDate || !toDate || !reason) {
+  if (!fromDate || !toDate || !reason)
     return res.status(400).json({ error: 'fromDate, toDate, and reason are required' });
-  }
   try {
     const { rows } = await db.query(
       `INSERT INTO leave_records (student_id, from_date, to_date, reason, medical_doc_url)
@@ -229,7 +226,6 @@ router.post('/leaves', menteeAuth, async (req, res) => {
       [studentId, fromDate, toDate, reason, medicalDocUrl || null]
     );
 
-    // Notify mentor
     const mentorRes = await db.query(
       `SELECT m.user_id, u.name AS student_name
        FROM students s
@@ -240,7 +236,8 @@ router.post('/leaves', menteeAuth, async (req, res) => {
     );
     if (mentorRes.rows.length) {
       const { user_id: mentorUserId, student_name } = mentorRes.rows[0];
-      await createNotification(mentorUserId, 'leave', `${student_name} submitted a leave request (${fromDate} to ${toDate})`);
+      await createNotification(mentorUserId, 'leave',
+        `${student_name} submitted a leave request (${fromDate} to ${toDate})`);
     }
 
     res.json(rows[0]);
@@ -377,6 +374,75 @@ router.post('/feedback', menteeAuth, async (req, res) => {
   }
 });
 
+// Fetch previously submitted feedback by the logged-in mentee
+router.get('/feedback', menteeAuth, async (req, res) => {
+  const studentId = req.user.roleId;
+  try {
+    const { rows } = await db.query(
+      `SELECT fe.*,
+              mu.name AS mentor_name,
+              m.department
+       FROM feedback_entries fe
+       JOIN mentors m ON m.id = fe.mentor_id
+       JOIN users mu ON mu.id = m.user_id
+       WHERE fe.student_id = $1
+       ORDER BY fe.created_at DESC`,
+      [studentId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /mentee/feedback:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  }
+});
+
+// ── FORUM (DISCUSSION) ────────────────────────────────────
+router.get('/forum', menteeAuth, async (req, res) => {
+  try {
+    const threadsRes = await db.query(
+      `SELECT ft.*, u.name AS author_name
+       FROM forum_threads ft JOIN users u ON u.id = ft.author_id
+       ORDER BY ft.pinned DESC, ft.created_at DESC`
+    );
+    const threads = await Promise.all(
+      threadsRes.rows.map(async (thread) => {
+        const repliesRes = await db.query(
+          `SELECT fr.*, u.name AS author
+           FROM forum_replies fr JOIN users u ON u.id = fr.author_id
+           WHERE fr.thread_id = $1 ORDER BY fr.created_at ASC`,
+          [thread.id]
+        );
+        return { ...thread, replies: repliesRes.rows.map(r => ({ ...r, date: r.created_at })) };
+      })
+    );
+    res.json(threads);
+  } catch (err) {
+    console.error('GET /mentee/forum:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  }
+});
+
+router.post('/forum/:id/reply', menteeAuth, async (req, res) => {
+  const threadId = Number(req.params.id);
+  const authorId = req.user.id;
+  const content = req.body.message || req.body.content;
+  if (!content || !content.trim()) return res.status(400).json({ error: 'content is required' });
+  try {
+    const threadCheck = await db.query(`SELECT id FROM forum_threads WHERE id = $1`, [threadId]);
+    if (!threadCheck.rows.length) return res.status(404).json({ error: 'Thread not found' });
+    const { rows } = await db.query(
+      `INSERT INTO forum_replies (thread_id, author_id, content)
+       VALUES ($1,$2,$3)
+       RETURNING *, (SELECT name FROM users WHERE id = $2) AS author`,
+      [threadId, authorId, content.trim()]
+    );
+    res.status(201).json({ ...rows[0], date: rows[0].created_at });
+  } catch (err) {
+    console.error('POST /mentee/forum/:id/reply:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  }
+});
+
 // ── CONCERN ───────────────────────────────────────────────
 router.post('/concern', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
@@ -388,7 +454,6 @@ router.post('/concern', menteeAuth, async (req, res) => {
       [studentId, content, anonymous || false]
     );
 
-    // Notify mentor (unless anonymous)
     if (!anonymous) {
       const mentorRes = await db.query(
         `SELECT m.user_id, u.name AS student_name
@@ -456,7 +521,6 @@ router.post('/sos', menteeAuth, async (req, res) => {
       [studentId]
     );
 
-    // Notify mentor
     const mentorRes = await db.query(
       `SELECT m.user_id, u.name AS student_name
        FROM students s
