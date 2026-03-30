@@ -5,16 +5,28 @@ const db = require('../db');
 
 const menteeAuth = auth(['mentee']);
 
+// ── HELPERS ───────────────────────────────────────────────
+async function createNotification(userId, type, message) {
+  try {
+    await db.query(
+      `INSERT INTO notifications (user_id, type, message) VALUES ($1, $2, $3)`,
+      [userId, type, message]
+    );
+  } catch (_) { /* non-critical */ }
+}
+
 // ── DASHBOARD ─────────────────────────────────────────────
 router.get('/dashboard', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
-
   try {
-    const [studentRes, meetingsRes, moodRes, docsRes] = await Promise.all([
+    const [studentRes, meetingsRes, moodRes] = await Promise.all([
       db.query(
-        `SELECT s.*, u.name, u.email 
-         FROM students s 
-         JOIN users u ON u.id = s.user_id 
+        `SELECT s.*, u.name, u.email,
+                mu.name AS mentor_name, mu.email AS mentor_email
+         FROM students s
+         JOIN users u ON u.id = s.user_id
+         LEFT JOIN mentors m ON m.id = s.mentor_id
+         LEFT JOIN users mu ON mu.id = m.user_id
          WHERE s.id = $1`,
         [studentId]
       ),
@@ -29,62 +41,24 @@ router.get('/dashboard', menteeAuth, async (req, res) => {
         [studentId]
       ),
       db.query(
-        `SELECT * FROM check_ins 
-         WHERE student_id = $1 
+        `SELECT * FROM check_ins
+         WHERE student_id = $1
          ORDER BY submitted_at DESC LIMIT 14`,
         [studentId]
       ),
-      db.query(
-        `SELECT * FROM documents 
-         WHERE student_id = $1 
-         ORDER BY uploaded_at DESC`,
-        [studentId]
-      )
     ]);
 
     const student = studentRes.rows[0];
-
-    // 🎯 Extract CGPA & Attendance from documents
-    let cgpa = 0;
-    let attendance = 0;
-
-    docsRes.rows.forEach(doc => {
-      if (doc.doc_type === 'grade') cgpa = doc.value || cgpa;
-      if (doc.doc_type === 'attendance') attendance = doc.value || attendance;
-    });
-
-    // fallback (temporary)
-    if (!cgpa) cgpa = student?.cgpa || 7.0;
-    if (!attendance) attendance = student?.attendance || 75;
-
-    // simple risk logic
-    let riskScore = 0;
-    let riskLevel = "Safe";
-
-    if (cgpa < 6 || attendance < 60) {
-      riskScore = 70;
-      riskLevel = "High";
-    } else if (cgpa < 7 || attendance < 75) {
-      riskScore = 40;
-      riskLevel = "Moderate";
-    }
+    if (!student) return res.status(404).json({ error: 'Student not found' });
 
     res.json({
       student,
       upcomingMeetings: meetingsRes.rows,
       moodTrend: moodRes.rows,
-
-      // ✅ NEW FIELDS (frontend needs these)
-      cgpa,
-      attendance,
-      placementStatus: student?.placement_status || "Not Started",
-      riskScore,
-      riskLevel
     });
-
   } catch (err) {
     console.error('GET /mentee/dashboard:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -93,14 +67,20 @@ router.get('/profile', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   try {
     const { rows } = await db.query(
-      `SELECT s.*, u.name, u.email FROM students s JOIN users u ON u.id = s.user_id WHERE s.id = $1`,
+      `SELECT s.*, u.name, u.email,
+              mu.name AS mentor_name, mu.email AS mentor_email
+       FROM students s
+       JOIN users u ON u.id = s.user_id
+       LEFT JOIN mentors m ON m.id = s.mentor_id
+       LEFT JOIN users mu ON mu.id = m.user_id
+       WHERE s.id = $1`,
       [studentId]
     );
     if (!rows.length) return res.status(404).json({ error: 'Not found' });
     res.json(rows[0]);
   } catch (err) {
     console.error('GET /mentee/profile:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -109,13 +89,15 @@ router.get('/checkin/today', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   try {
     const { rows } = await db.query(
-      `SELECT * FROM check_ins WHERE student_id = $1 AND submitted_at::date = CURRENT_DATE ORDER BY submitted_at DESC LIMIT 1`,
+      `SELECT * FROM check_ins
+       WHERE student_id = $1 AND submitted_at::date = CURRENT_DATE
+       ORDER BY submitted_at DESC LIMIT 1`,
       [studentId]
     );
     res.json({ submitted: rows.length > 0, checkin: rows[0] || null });
   } catch (err) {
     console.error('GET /mentee/checkin/today:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -123,86 +105,23 @@ router.get('/checkin/today', menteeAuth, async (req, res) => {
 router.post('/checkin', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   const { mood, update } = req.body;
-  const progress = req.body.progress || req.body.academicProgress;
+  const progress = req.body.progress || req.body.academicProgress || '';
+  if (!mood) return res.status(400).json({ error: 'mood is required' });
   try {
     const { rows } = await db.query(
       `INSERT INTO check_ins (student_id, mood, update_text, academic_progress)
        VALUES ($1, $2, $3, $4) RETURNING *`,
-      [studentId, mood, update || '', progress || '']
+      [studentId, mood, update || '', progress]
     );
-    // Update student last_check_in
+    const moodLabel = mood >= 4 ? 'Happy' : mood >= 3 ? 'Neutral' : mood >= 2 ? 'Stressed' : 'Sad';
     await db.query(
       `UPDATE students SET last_check_in = CURRENT_DATE, mood = $1 WHERE id = $2`,
-      [mood >= 4 ? 'Happy' : mood >= 3 ? 'Neutral' : mood >= 2 ? 'Stressed' : 'Sad', studentId]
+      [moodLabel, studentId]
     );
     res.json(rows[0]);
   } catch (err) {
     console.error('POST /mentee/checkin:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// ── GET CHECK-INS ─────────────────────────────────────────
-router.get('/checkin', menteeAuth, async (req, res) => {
-  const studentId = req.user.roleId;
-  try {
-    const { rows } = await db.query(
-      `SELECT * FROM check_ins WHERE student_id = $1 ORDER BY submitted_at DESC`,
-      [studentId]
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// ── DOCUMENTS ────────────────────────────────────────────
-router.get('/documents', menteeAuth, async (req, res) => {
-  const studentId = req.user.roleId;
-  try {
-    const { rows } = await db.query(
-      `SELECT * FROM documents WHERE student_id = $1 ORDER BY uploaded_at DESC`,
-      [studentId]
-    );
-    res.json(rows);
-  } catch (err) {
-    console.error('GET /mentee/documents:', err);
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-// ── NOTIFICATIONS ───────────────────────────────────────
-router.get('/notifications', menteeAuth, async (_req, res) => {
-  res.json([]);
-});
-
-// ── LEAVES ────────────────────────────────────────────────
-router.get('/leaves', menteeAuth, async (req, res) => {
-  const studentId = req.user.roleId;
-  try {
-    const { rows } = await db.query(
-      `SELECT * FROM leave_records WHERE student_id = $1 ORDER BY created_at DESC`,
-      [studentId]
-    );
-    res.json(rows);
-  } catch (err) {
-    res.status(500).json({ error: 'Server error' });
-  }
-});
-
-router.post('/leaves', menteeAuth, async (req, res) => {
-  const studentId = req.user.roleId;
-  const { fromDate, toDate, reason, medicalDocUrl } = req.body;
-  try {
-    const { rows } = await db.query(
-      `INSERT INTO leave_records (student_id, from_date, to_date, reason, medical_doc_url)
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-      [studentId, fromDate, toDate, reason, medicalDocUrl || null]
-    );
-    res.json(rows[0]);
-  } catch (err) {
-    console.error('POST /mentee/leaves:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -216,36 +135,40 @@ router.get('/documents', menteeAuth, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('GET /mentee/documents:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
 router.post('/documents', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   const { title, description, fileUrl, docType } = req.body;
+  if (!title) return res.status(400).json({ error: 'title is required' });
   try {
     const { rows } = await db.query(
       `INSERT INTO documents (student_id, title, description, file_url, doc_type, status, suspicion_score)
        VALUES ($1, $2, $3, $4, $5, 'Clean', 0) RETURNING *`,
-      [studentId, title, description || null, fileUrl, docType || 'other']
+      [studentId, title, description || null, fileUrl || null, docType || 'other']
     );
     res.json(rows[0]);
   } catch (err) {
     console.error('POST /mentee/documents:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
 router.delete('/documents/:id', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   try {
-    await db.query(
+    const { rowCount } = await db.query(
       `DELETE FROM documents WHERE id = $1 AND student_id = $2`,
       [req.params.id, studentId]
     );
+    if (!rowCount) return res.status(404).json({ error: 'Document not found' });
     res.json({ message: 'Deleted' });
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('DELETE /mentee/documents/:id:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -254,12 +177,76 @@ router.get('/notifications', menteeAuth, async (req, res) => {
   const userId = req.user.id;
   try {
     const { rows } = await db.query(
-      `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 20`,
+      `SELECT * FROM notifications WHERE user_id = $1 ORDER BY created_at DESC LIMIT 30`,
       [userId]
     );
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('GET /mentee/notifications:', err);
+    res.json([]); // non-critical, return empty
+  }
+});
+
+// ── MARK NOTIFICATION READ ────────────────────────────────
+router.put('/notifications/:id/read', menteeAuth, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    await db.query(
+      `UPDATE notifications SET read = TRUE WHERE id = $1 AND user_id = $2`,
+      [req.params.id, userId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    res.json({ ok: false });
+  }
+});
+
+// ── LEAVES ────────────────────────────────────────────────
+router.get('/leaves', menteeAuth, async (req, res) => {
+  const studentId = req.user.roleId;
+  try {
+    const { rows } = await db.query(
+      `SELECT * FROM leave_records WHERE student_id = $1 ORDER BY created_at DESC`,
+      [studentId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /mentee/leaves:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  }
+});
+
+router.post('/leaves', menteeAuth, async (req, res) => {
+  const studentId = req.user.roleId;
+  const { fromDate, toDate, reason, medicalDocUrl } = req.body;
+  if (!fromDate || !toDate || !reason) {
+    return res.status(400).json({ error: 'fromDate, toDate, and reason are required' });
+  }
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO leave_records (student_id, from_date, to_date, reason, medical_doc_url)
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [studentId, fromDate, toDate, reason, medicalDocUrl || null]
+    );
+
+    // Notify mentor
+    const mentorRes = await db.query(
+      `SELECT m.user_id, u.name AS student_name
+       FROM students s
+       JOIN mentors m ON m.id = s.mentor_id
+       JOIN users u ON u.id = s.user_id
+       WHERE s.id = $1`,
+      [studentId]
+    );
+    if (mentorRes.rows.length) {
+      const { user_id: mentorUserId, student_name } = mentorRes.rows[0];
+      await createNotification(mentorUserId, 'leave', `${student_name} submitted a leave request (${fromDate} to ${toDate})`);
+    }
+
+    res.json(rows[0]);
+  } catch (err) {
+    console.error('POST /mentee/leaves:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -283,7 +270,7 @@ router.get('/goals', menteeAuth, async (req, res) => {
     res.json(rows);
   } catch (err) {
     console.error('GET /mentee/goals:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -292,7 +279,6 @@ router.put('/goals/:goalId/tasks/:taskId', menteeAuth, async (req, res) => {
   const { goalId, taskId } = req.params;
   const { completed } = req.body;
   try {
-    // Verify goal belongs to student
     const goalCheck = await db.query(
       `SELECT id FROM goals WHERE id = $1 AND student_id = $2`,
       [goalId, studentId]
@@ -304,11 +290,7 @@ router.put('/goals/:goalId/tasks/:taskId', menteeAuth, async (req, res) => {
       [completed, taskId, goalId]
     );
 
-    // Recalculate progress
-    const tasks = await db.query(
-      `SELECT completed FROM goal_tasks WHERE goal_id = $1`,
-      [goalId]
-    );
+    const tasks = await db.query(`SELECT completed FROM goal_tasks WHERE goal_id = $1`, [goalId]);
     const total = tasks.rows.length;
     const done = tasks.rows.filter(t => t.completed).length;
     const progress = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -318,11 +300,10 @@ router.put('/goals/:goalId/tasks/:taskId', menteeAuth, async (req, res) => {
       `UPDATE goals SET progress = $1, completed = $2 WHERE id = $3 RETURNING *`,
       [progress, isCompleted, goalId]
     );
-
     res.json(updated.rows[0]);
   } catch (err) {
     console.error('PUT /mentee/goals task:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -336,7 +317,8 @@ router.get('/resources', menteeAuth, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('GET /mentee/resources:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -350,23 +332,26 @@ router.get('/skills', menteeAuth, async (req, res) => {
     );
     res.json(rows);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('GET /mentee/skills:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
 router.post('/skills', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   const { type, title, description, link, entryDate } = req.body;
+  if (!type || !title) return res.status(400).json({ error: 'type and title are required' });
   try {
     const { rows } = await db.query(
       `INSERT INTO skill_entries (student_id, type, title, description, link, entry_date)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [studentId, type, title, description || null, link || null, entryDate || new Date().toISOString().split('T')[0]]
+      [studentId, type, title, description || null, link || null,
+       entryDate || new Date().toISOString().split('T')[0]]
     );
     res.json(rows[0]);
   } catch (err) {
     console.error('POST /mentee/skills:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -374,20 +359,21 @@ router.post('/skills', menteeAuth, async (req, res) => {
 router.post('/feedback', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   const { rating, comment } = req.body;
+  if (!rating) return res.status(400).json({ error: 'rating is required' });
   try {
-    // Get mentor_id for this student
     const studentRes = await db.query(`SELECT mentor_id FROM students WHERE id = $1`, [studentId]);
     const mentorId = studentRes.rows[0]?.mentor_id;
     if (!mentorId) return res.status(400).json({ error: 'No mentor assigned' });
 
     const { rows } = await db.query(
-      `INSERT INTO feedback_entries (student_id, mentor_id, rating, comment) VALUES ($1,$2,$3,$4) RETURNING *`,
-      [studentId, mentorId, rating, comment]
+      `INSERT INTO feedback_entries (student_id, mentor_id, rating, comment)
+       VALUES ($1,$2,$3,$4) RETURNING *`,
+      [studentId, mentorId, rating, comment || '']
     );
     res.json(rows[0]);
   } catch (err) {
     console.error('POST /mentee/feedback:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -395,15 +381,33 @@ router.post('/feedback', menteeAuth, async (req, res) => {
 router.post('/concern', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
   const { content, anonymous } = req.body;
+  if (!content) return res.status(400).json({ error: 'content is required' });
   try {
     const { rows } = await db.query(
       `INSERT INTO concerns (student_id, content, anonymous) VALUES ($1,$2,$3) RETURNING id`,
       [studentId, content, anonymous || false]
     );
+
+    // Notify mentor (unless anonymous)
+    if (!anonymous) {
+      const mentorRes = await db.query(
+        `SELECT m.user_id, u.name AS student_name
+         FROM students s
+         JOIN mentors m ON m.id = s.mentor_id
+         JOIN users u ON u.id = s.user_id
+         WHERE s.id = $1`,
+        [studentId]
+      );
+      if (mentorRes.rows.length) {
+        const { user_id: mentorUserId, student_name } = mentorRes.rows[0];
+        await createNotification(mentorUserId, 'concern', `${student_name} raised a concern`);
+      }
+    }
+
     res.json(rows[0]);
   } catch (err) {
     console.error('POST /mentee/concern:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -414,7 +418,8 @@ router.get('/health', menteeAuth, async (req, res) => {
     const { rows } = await db.query(`SELECT * FROM health_info WHERE student_id = $1`, [studentId]);
     res.json(rows[0] || null);
   } catch (err) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('GET /mentee/health:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -426,15 +431,19 @@ router.put('/health', menteeAuth, async (req, res) => {
       `INSERT INTO health_info (student_id, blood_group, chronic_conditions, insurance_info, emergency_contacts)
        VALUES ($1,$2,$3,$4,$5)
        ON CONFLICT (student_id) DO UPDATE SET
-         blood_group = $2, chronic_conditions = $3, insurance_info = $4,
-         emergency_contacts = $5, updated_at = NOW()
+         blood_group = EXCLUDED.blood_group,
+         chronic_conditions = EXCLUDED.chronic_conditions,
+         insurance_info = EXCLUDED.insurance_info,
+         emergency_contacts = EXCLUDED.emergency_contacts,
+         updated_at = NOW()
        RETURNING *`,
-      [studentId, bloodGroup, chronicConditions, insuranceInfo, JSON.stringify(emergencyContacts || [])]
+      [studentId, bloodGroup || null, chronicConditions || 'None',
+       insuranceInfo || 'None', JSON.stringify(emergencyContacts || [])]
     );
     res.json(rows[0]);
   } catch (err) {
     console.error('PUT /mentee/health:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
@@ -446,10 +455,25 @@ router.post('/sos', menteeAuth, async (req, res) => {
       `INSERT INTO sos_alerts (student_id) VALUES ($1) RETURNING id`,
       [studentId]
     );
+
+    // Notify mentor
+    const mentorRes = await db.query(
+      `SELECT m.user_id, u.name AS student_name
+       FROM students s
+       JOIN mentors m ON m.id = s.mentor_id
+       JOIN users u ON u.id = s.user_id
+       WHERE s.id = $1`,
+      [studentId]
+    );
+    if (mentorRes.rows.length) {
+      const { user_id: mentorUserId, student_name } = mentorRes.rows[0];
+      await createNotification(mentorUserId, 'sos', `🚨 SOS alert from ${student_name}`);
+    }
+
     res.json(rows[0]);
   } catch (err) {
     console.error('POST /mentee/sos:', err);
-    res.status(500).json({ error: 'Server error' });
+    res.status(500).json({ error: 'Server error', detail: err.message });
   }
 });
 
