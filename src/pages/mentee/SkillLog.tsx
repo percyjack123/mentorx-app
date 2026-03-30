@@ -5,13 +5,14 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { menteeApi } from "@/lib/api";
+import type { SkillType } from "@/lib/api";
 import { toast } from "@/hooks/use-toast";
 import { Award, ExternalLink, Loader2 } from "lucide-react";
 
 export default function SkillLog() {
   const [skills, setSkills] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [type, setType] = useState("");
+  const [type, setType] = useState<SkillType>("Internship");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [link, setLink] = useState("");
@@ -31,7 +32,7 @@ export default function SkillLog() {
       const entry = await menteeApi.addSkill({ type, title, description, link, entryDate: new Date().toISOString().split('T')[0] });
       setSkills(prev => [entry as any, ...prev]);
       toast({ title: "Skill entry added!", description: "Your entry has been logged." });
-      setType(""); setTitle(""); setDescription(""); setLink("");
+      setType("Internship"); setTitle(""); setDescription(""); setLink("");
     } catch {
       toast({ title: "Error", description: "Failed to add skill entry", variant: "destructive" });
     } finally {
@@ -50,7 +51,7 @@ export default function SkillLog() {
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
             <Label>Type</Label>
-            <Select value={type} onValueChange={setType}>
+            <Select value={type} onValueChange={(value) => setType(value as SkillType)}>
               <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="Internship">Internship</SelectItem>

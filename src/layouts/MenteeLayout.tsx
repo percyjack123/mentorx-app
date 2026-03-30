@@ -35,6 +35,7 @@ const items = [
   { title: "Goals", url: "/mentee/goals", icon: Target },
   { title: "Skill Log", url: "/mentee/skills", icon: Award },
   { title: "Resources", url: "/mentee/resources", icon: BookOpen },
+  { title: "Forum", url: "/mentee/forum", icon: MessageSquare },
   { title: "Raise Concern", url: "/mentee/concern", icon: MessageSquare },
   { title: "Health Info", url: "/mentee/health", icon: Heart },
   { title: "Emergency SOS", url: "/mentee/sos", icon: AlertOctagon },

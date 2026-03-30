@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 // Auth
 import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
+import VerifyEmail from "./pages/auth/VerifyEmail";
 
 // Layouts
 import AdminLayout from "./layouts/AdminLayout";
@@ -44,6 +45,7 @@ import RaiseConcern from "./pages/mentee/RaiseConcern";
 import HealthInfo from "./pages/mentee/HealthInfo";
 import SOS from "./pages/mentee/SOS";
 import MenteeFeedback from "./pages/mentee/Feedback";
+import MenteeForum from "./pages/mentee/Forum";
 
 // Parent pages
 import ParentDashboard from "./pages/parent/Dashboard";
@@ -69,6 +71,7 @@ const App = () => (
           <Route path="/" element={<Navigate to="/login" replace />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
 
           {/* Admin Routes */}
           <Route path="/admin" element={<AdminLayout />}>
@@ -101,6 +104,7 @@ const App = () => (
             <Route path="goals" element={<Goals />} />
             <Route path="skills" element={<SkillLog />} />
             <Route path="resources" element={<MenteeResources />} />
+            <Route path="forum" element={<MenteeForum />} />
             <Route path="concern" element={<RaiseConcern />} />
             <Route path="health" element={<HealthInfo />} />
             <Route path="sos" element={<SOS />} />

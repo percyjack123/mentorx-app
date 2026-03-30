@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const auth = require('../middleware/auth');
 const db = require('../db');
+const { extractDataFromImage } = require('../utils/ocr');
 
 const menteeAuth = auth(['mentee']);
 
@@ -149,7 +150,30 @@ router.post('/documents', menteeAuth, async (req, res) => {
        VALUES ($1, $2, $3, $4, $5, 'Clean', 0) RETURNING *`,
       [studentId, title, description || null, fileUrl || null, docType || 'other']
     );
-    res.json(rows[0]);
+    const document = rows[0];
+
+    // Attempt to extract CGPA/Attendance if relevant
+    if (fileUrl && (docType === 'grade' || docType === 'attendance')) {
+      const { cgpa, attendance } = await extractDataFromImage(fileUrl);
+      const updates = [];
+      const params = [];
+      if (cgpa !== null) {
+        updates.push(`cgpa = $${params.length + 1}`);
+        params.push(cgpa);
+        document.extracted_cgpa = cgpa;
+      }
+      if (attendance !== null) {
+        updates.push(`attendance = $${params.length + 1}`);
+        params.push(attendance);
+        document.extracted_attendance = attendance;
+      }
+      if (updates.length > 0) {
+        params.push(studentId);
+        await db.query(`UPDATE students SET ${updates.join(', ')} WHERE id = $${params.length}`, params);
+      }
+    }
+
+    res.json(document);
   } catch (err) {
     console.error('POST /mentee/documents:', err);
     res.status(500).json({ error: 'Server error', detail: err.message });
@@ -355,8 +379,8 @@ router.post('/skills', menteeAuth, async (req, res) => {
 // ── FEEDBACK ──────────────────────────────────────────────
 router.post('/feedback', menteeAuth, async (req, res) => {
   const studentId = req.user.roleId;
-  const { rating, comment } = req.body;
-  if (!rating) return res.status(400).json({ error: 'rating is required' });
+  const { rating = 5, comment, message, content } = req.body;
+  const finalComment = comment || message || content || '';
   try {
     const studentRes = await db.query(`SELECT mentor_id FROM students WHERE id = $1`, [studentId]);
     const mentorId = studentRes.rows[0]?.mentor_id;
@@ -365,7 +389,7 @@ router.post('/feedback', menteeAuth, async (req, res) => {
     const { rows } = await db.query(
       `INSERT INTO feedback_entries (student_id, mentor_id, rating, comment)
        VALUES ($1,$2,$3,$4) RETURNING *`,
-      [studentId, mentorId, rating, comment || '']
+      [studentId, mentorId, rating, finalComment]
     );
     res.json(rows[0]);
   } catch (err) {

@@ -91,7 +91,7 @@ router.get('/mentees/:id', mentorAuth, async (req, res) => {
     );
     if (!ownerCheck.rows.length) return res.status(403).json({ error: 'Access denied' });
 
-    const [studentRes, checkInsRes, leaveRes, docsRes, goalsRes, skillsRes, healthRes] = await Promise.all([
+    const [studentRes, checkInsRes, leaveRes, docsRes, goalsRes, skillsRes, healthRes, feedbackRes] = await Promise.all([
       db.query(
         `SELECT s.*, u.name, u.email FROM students s
          JOIN users u ON u.id = s.user_id WHERE s.id = $1`,
@@ -126,6 +126,14 @@ router.get('/mentees/:id', mentorAuth, async (req, res) => {
         [studentId]
       ),
       db.query(`SELECT * FROM health_info WHERE student_id = $1`, [studentId]),
+      db.query(
+        `SELECT fe.*, u.name AS student_name 
+         FROM feedback_entries fe
+         JOIN students s ON s.id = fe.student_id
+         JOIN users u ON u.id = s.user_id
+         WHERE fe.student_id = $1 AND fe.mentor_id = $2`,
+        [studentId, mentorId]
+      ),
     ]);
 
     if (!studentRes.rows.length) return res.status(404).json({ error: 'Student not found' });
@@ -138,6 +146,7 @@ router.get('/mentees/:id', mentorAuth, async (req, res) => {
       goals:        goalsRes.rows,
       skillEntries: skillsRes.rows,
       healthInfo:   healthRes.rows[0] || null,
+      feedback:     feedbackRes.rows,
     });
   } catch (err) {
     console.error('GET /mentor/mentees/:id:', err);
@@ -421,6 +430,23 @@ router.get('/forum', mentorAuth, async (req, res) => {
   }
 });
 
+router.post('/forum', mentorAuth, async (req, res) => {
+  const { title, content } = req.body;
+  const authorId = req.user.id;
+  if (!title || !content) return res.status(400).json({ error: 'Title and content are required' });
+  try {
+    const { rows } = await db.query(
+      `INSERT INTO forum_threads (title, content, author_id)
+       VALUES ($1, $2, $3) RETURNING *`,
+      [title.trim(), content.trim(), authorId]
+    );
+    res.status(201).json(rows[0]);
+  } catch (err) {
+    console.error('POST /mentor/forum:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  }
+});
+
 router.post('/forum/:id/reply', mentorAuth, async (req, res) => {
   const threadId = Number(req.params.id);
   const authorId = req.user.id;
@@ -559,6 +585,114 @@ router.get('/requests', mentorAuth, async (req, res) => {
   }
 });
 
+// ── MENTEE APPROVALS ─────────────────────────────────────
+// Pending mentees are derived from mentor_requests + users.isApproved=false.
+router.get('/pending-mentees', mentorAuth, async (req, res) => {
+  const mentorId = getMentorId(req);
+  if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
+  try {
+    const { rows } = await db.query(
+      `SELECT s.*, u.name AS mentee_name, u.email AS mentee_email, mr.created_at AS request_created_at
+       FROM mentor_requests mr
+       JOIN students s ON s.id = mr.student_id
+       JOIN users u ON u.id = s.user_id
+       WHERE mr.mentor_id = $1
+         AND mr.status = 'Pending'
+         AND u."isApproved" = FALSE
+       ORDER BY mr.created_at ASC`,
+      [mentorId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('GET /mentor/pending-mentees:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  }
+});
+
+router.post('/approve/:menteeId', mentorAuth, async (req, res) => {
+  const mentorId = getMentorId(req);
+  const menteeStudentId = Number(req.params.menteeId);
+  if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
+  if (isNaN(menteeStudentId)) return res.status(400).json({ error: 'Invalid menteeId' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const mentorUserRes = await client.query(`SELECT user_id FROM mentors WHERE id = $1`, [mentorId]);
+    if (!mentorUserRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Mentor not found' });
+    }
+    const mentorUserId = mentorUserRes.rows[0].user_id;
+
+    const menteeUserRes = await client.query(`SELECT user_id FROM students WHERE id = $1`, [menteeStudentId]);
+    if (!menteeUserRes.rows.length) {
+      await client.query('ROLLBACK');
+      return res.status(404).json({ error: 'Mentee not found' });
+    }
+    const menteeUserId = menteeUserRes.rows[0].user_id;
+
+    await client.query(
+      `UPDATE users
+       SET "isApproved" = TRUE,
+           "mentorId" = $1
+       WHERE id = $2`,
+      [mentorUserId, menteeUserId]
+    );
+
+    await client.query(`UPDATE students SET mentor_id = $1 WHERE id = $2`, [mentorId, menteeStudentId]);
+
+    await client.query(
+      `UPDATE mentor_requests SET status = 'Accepted'
+       WHERE student_id = $1 AND mentor_id = $2`,
+      [menteeStudentId, mentorId]
+    );
+    await client.query(
+      `UPDATE mentor_requests SET status = 'Rejected'
+       WHERE student_id = $1 AND mentor_id != $2 AND status = 'Pending'`,
+      [menteeStudentId, mentorId]
+    );
+
+    await client.query('COMMIT');
+
+    await createNotification(menteeUserId, 'mentor_request', 'Your mentor request was accepted');
+    res.json({ message: 'Mentee approved' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('POST /mentor/approve/:menteeId:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  } finally {
+    client.release();
+  }
+});
+
+router.post('/reject/:menteeId', mentorAuth, async (req, res) => {
+  const mentorId = getMentorId(req);
+  const menteeStudentId = Number(req.params.menteeId);
+  if (!mentorId) return res.status(400).json({ error: 'mentor_id required for admin' });
+  if (isNaN(menteeStudentId)) return res.status(400).json({ error: 'Invalid menteeId' });
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query(
+      `UPDATE mentor_requests
+       SET status = 'Rejected'
+       WHERE student_id = $1 AND mentor_id = $2 AND status = 'Pending'`,
+      [menteeStudentId, mentorId]
+    );
+    await client.query('COMMIT');
+    res.json({ message: 'Mentee rejected' });
+  } catch (err) {
+    await client.query('ROLLBACK');
+    console.error('POST /mentor/reject/:menteeId:', err);
+    res.status(500).json({ error: 'Server error', detail: err.message });
+  } finally {
+    client.release();
+  }
+});
+
 router.put('/requests/:id/accept', mentorAuth, async (req, res) => {
   const mentorId = getMentorId(req);
   const requestId = Number(req.params.id);
@@ -577,6 +711,19 @@ router.put('/requests/:id/accept', mentorAuth, async (req, res) => {
     const { student_id: studentId } = requestRes.rows[0];
     await client.query(`UPDATE mentor_requests SET status = 'Accepted' WHERE id = $1`, [requestId]);
     await client.query(`UPDATE students SET mentor_id = $1 WHERE id = $2`, [mentorId, studentId]);
+
+    // RBAC: mark mentee approved on mentor acceptance
+    const mentorUserRes = await client.query(`SELECT user_id FROM mentors WHERE id = $1`, [mentorId]);
+    const menteeUserRes = await client.query(`SELECT user_id FROM students WHERE id = $1`, [studentId]);
+    if (mentorUserRes.rows.length && menteeUserRes.rows.length) {
+      await client.query(
+        `UPDATE users
+         SET "isApproved" = TRUE,
+             "mentorId" = $1
+         WHERE id = $2`,
+        [mentorUserRes.rows[0].user_id, menteeUserRes.rows[0].user_id]
+      );
+    }
     await client.query(
       `UPDATE mentor_requests SET status = 'Rejected'
        WHERE student_id = $1 AND mentor_id != $2 AND status = 'Pending'`,

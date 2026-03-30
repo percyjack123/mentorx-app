@@ -10,12 +10,36 @@ export default function Forum() {
   const [loading, setLoading] = useState(true);
   const [replyText, setReplyText] = useState<Record<number, string>>({});
 
+  // Create thread form state
+  const [newTitle, setNewTitle] = useState("");
+  const [newContent, setNewContent] = useState("");
+  const [creating, setCreating] = useState(false);
+
   useEffect(() => {
     mentorApi.getForumThreads()
       .then(setThreads)
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
+
+  const handleCreateThread = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newTitle.trim() || !newContent.trim()) return;
+    setCreating(true);
+    try {
+      await mentorApi.createForumThread({ title: newTitle, content: newContent });
+      toast({ title: "Thread created successfully" });
+      setNewTitle("");
+      setNewContent("");
+      // Refresh list
+      const updated = await mentorApi.getForumThreads();
+      setThreads(updated);
+    } catch {
+      toast({ title: "Error", description: "Failed to create thread", variant: "destructive" });
+    } finally {
+      setCreating(false);
+    }
+  };
 
   const handleReply = async (threadId: number) => {
     const content = replyText[threadId];
@@ -39,6 +63,36 @@ export default function Forum() {
         <h1 className="text-2xl font-bold font-display">Discussion Forum</h1>
         <p className="text-muted-foreground">Collaborate with fellow mentors</p>
       </div>
+
+      {/* Create Thread Form */}
+      <div className="rounded-xl border bg-card p-6 shadow-sm">
+        <h2 className="text-lg font-semibold mb-4">Create New Thread</h2>
+        <form onSubmit={handleCreateThread} className="space-y-4">
+          <div className="space-y-2">
+            <Textarea
+              placeholder="Title"
+              value={newTitle}
+              onChange={e => setNewTitle(e.target.value)}
+              rows={1}
+              className="font-semibold"
+              required
+            />
+          </div>
+          <div className="space-y-2">
+            <Textarea
+              placeholder="What's on your mind?"
+              value={newContent}
+              onChange={e => setNewContent(e.target.value)}
+              rows={3}
+              required
+            />
+          </div>
+          <Button type="submit" disabled={creating} className="gradient-primary text-primary-foreground">
+            {creating ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Posting...</> : "Post Thread"}
+          </Button>
+        </form>
+      </div>
+
       <div className="space-y-4">
         {threads.map(thread => (
           <div key={thread.id} className="rounded-xl border bg-card p-6">

@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Star, Loader2 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { menteeApi } from "@/lib/api";
+import { menteeApi, type FeedbackEntry } from "@/lib/api";
 
 export default function MenteeFeedback() {
   const [rating, setRating] = useState(0);
@@ -12,6 +12,16 @@ export default function MenteeFeedback() {
   const [hoveredStar, setHoveredStar] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [entries, setEntries] = useState<FeedbackEntry[]>([]);
+  const [loadingEntries, setLoadingEntries] = useState(true);
+
+  useEffect(() => {
+    menteeApi
+      .getFeedback()
+      .then((res) => setEntries(res))
+      .catch(console.error)
+      .finally(() => setLoadingEntries(false));
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,6 +30,9 @@ export default function MenteeFeedback() {
     try {
       await menteeApi.submitFeedback({ rating, comment: feedback });
       setSubmitted(true);
+      // Refresh list with newly created entry
+      const refreshed = await menteeApi.getFeedback();
+      setEntries(refreshed);
       toast({ title: "Feedback submitted", description: "Thank you for your anonymous feedback." });
       setRating(0);
       setFeedback("");
@@ -80,6 +93,37 @@ export default function MenteeFeedback() {
           </Button>
         </form>
       )}
+
+      <div className="rounded-xl border bg-card p-6">
+        <h3 className="font-semibold font-display mb-4">Your Submitted Feedback</h3>
+        {loadingEntries ? (
+          <div className="flex items-center gap-2 text-muted-foreground text-sm">
+            <Loader2 className="animate-spin h-4 w-4" /> Loading...
+          </div>
+        ) : entries.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No feedback submitted yet.</p>
+        ) : (
+          <div className="space-y-4">
+            {entries.map((f) => (
+              <div key={f.id} className="p-4 rounded-lg bg-muted/50">
+                <div className="flex items-center gap-1 mb-2">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`h-4 w-4 ${
+                        s <= f.rating ? "fill-warning text-warning" : "text-muted-foreground/30"
+                      }`}
+                    />
+                  ))}
+                  <span className="text-sm text-muted-foreground ml-2">{f.rating} / 5</span>
+                </div>
+                {f.comment && <p className="text-sm">{f.comment}</p>}
+                <p className="text-xs text-muted-foreground mt-2">{new Date(f.created_at).toLocaleDateString()}</p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

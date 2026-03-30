@@ -17,6 +17,25 @@ CREATE TABLE IF NOT EXISTS users (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
+-- ── RBAC / Verification Columns ─────────────────────────────
+-- These additions are backwards-compatible (defaults keep existing inserts working).
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "isVerified" BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "isApproved" BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "mentorId" INTEGER REFERENCES users(id) ON DELETE SET NULL;
+ALTER TABLE users ADD COLUMN IF NOT EXISTS "parentLinkedTo" INTEGER REFERENCES users(id) ON DELETE SET NULL;
+
+-- Email verification tokens (OTP/token-based).
+CREATE TABLE IF NOT EXISTS email_verification_tokens (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  token VARCHAR(255) UNIQUE NOT NULL,
+  expires_at TIMESTAMP NOT NULL,
+  used BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_user ON email_verification_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_email_verification_tokens_token ON email_verification_tokens(token);
+
 -- =====================
 -- MENTORS TABLE
 -- =====================
@@ -281,6 +300,30 @@ CREATE TABLE IF NOT EXISTS parents (
   relationship VARCHAR(50),
   created_at TIMESTAMP DEFAULT NOW()
 );
+
+-- ── Backfill existing data (to avoid breaking current flows) ──
+-- Existing mentors: allow login once admin has set mentors.status = 'Active'.
+UPDATE users
+SET "isVerified" = TRUE
+WHERE role = 'mentor';
+
+-- Existing mentees: if they already have a mentor assigned, treat them as approved.
+UPDATE users u
+SET "isVerified" = TRUE,
+    "isApproved" = TRUE,
+    "mentorId" = m.id
+FROM students s
+JOIN mentors mm ON mm.id = s.mentor_id
+JOIN users m ON m.id = mm.user_id
+WHERE u.id = s.user_id
+  AND u.role = 'mentee'
+  AND s.mentor_id IS NOT NULL;
+
+-- Existing parents: mark as verified if a parent row exists.
+UPDATE users u
+SET "isVerified" = TRUE
+WHERE u.role = 'parent'
+  AND EXISTS (SELECT 1 FROM parents p WHERE p.user_id = u.id);
 CREATE TABLE IF NOT EXISTS checkins (
   id SERIAL PRIMARY KEY,
   student_id INTEGER REFERENCES students(id) ON DELETE CASCADE,

@@ -1,44 +1,65 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { parentApi } from "@/lib/api";
+import type { ChildProfileData, CheckIn, Document, LeaveRecord } from "@/lib/api";
 import { RiskBadge, DocBadge, LeaveBadge } from "@/components/StatusBadges";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 import { AlertTriangle, Lightbulb, ExternalLink, Loader2, MessageSquare } from "lucide-react";
+import type { DocumentStatus } from "@/data/mockData";
 
 export default function ChildProfile() {
   const { id } = useParams();
-  const [data, setData] = useState<any>(null);
+  const [data, setData] = useState<ChildProfileData | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    parentApi.getChild(Number(id))
+    if (!id) return;
+    parentApi
+      .getChild(Number(id))
       .then(setData)
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [id]);
 
-  if (loading) return (
-    <div className="flex items-center gap-2 text-muted-foreground">
-      <Loader2 className="animate-spin h-4 w-4" /> Loading...
-    </div>
-  );
+  if (loading)
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="animate-spin h-4 w-4" /> Loading...
+      </div>
+    );
   if (!data) return <p className="text-muted-foreground">Student not found.</p>;
 
-  const { student, checkIns, leaveRecords, documents, skillEntries, healthInfo, mentorFeedback } = data;
+  const { student, checkIns, leaveRecords, documents, healthInfo, mentorFeedback } = data;
 
-  const moodTrendData = (checkIns || []).slice().reverse().map((c: any) => ({
-    date: new Date(c.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-    score: c.mood,
-  }));
+  const moodTrendData = (checkIns ?? [])
+    .slice()
+    .reverse()
+    .map((c: CheckIn) => ({
+      date: new Date(c.submitted_at).toLocaleDateString("en-US", {
+        month: "short",
+        day: "numeric",
+      }),
+      score: c.mood,
+    }));
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold font-display">{student.name}</h1>
-          <p className="text-muted-foreground">{student.department} • Semester {student.semester}</p>
+          <p className="text-muted-foreground">
+            {student.department} • Semester {student.semester}
+          </p>
         </div>
         <RiskBadge level={student.risk_level} className="text-sm px-4 py-1.5" />
       </div>
@@ -85,13 +106,13 @@ export default function ChildProfile() {
         </div>
       </div>
 
-      {mentorFeedback?.length > 0 && (
+      {(mentorFeedback ?? []).length > 0 && (
         <div className="rounded-xl border bg-card p-6">
           <h3 className="font-semibold font-display flex items-center gap-2 mb-4">
             <MessageSquare className="h-4 w-4 text-primary" /> Mentor Feedback
           </h3>
           <div className="space-y-3">
-            {mentorFeedback.map((fb: any, i: number) => (
+            {mentorFeedback!.map((fb, i) => (
               <div key={i} className="p-4 rounded-lg bg-muted/50 border-l-4 border-primary/30">
                 <p className="text-sm">{fb.comment}</p>
                 <p className="text-xs text-muted-foreground mt-1">
@@ -117,7 +138,10 @@ export default function ChildProfile() {
           <h3 className="font-semibold mb-4">Current CGPA</h3>
           <p className="text-3xl font-bold font-display">{student.cgpa}</p>
           <div className="w-full bg-muted rounded-full h-3 mt-3">
-            <div className="gradient-primary h-3 rounded-full" style={{ width: `${(student.cgpa / 10) * 100}%` }} />
+            <div
+              className="gradient-primary h-3 rounded-full"
+              style={{ width: `${(student.cgpa / 10) * 100}%` }}
+            />
           </div>
           <p className="text-sm text-muted-foreground mt-2">{student.cgpa} / 10.0</p>
         </TabsContent>
@@ -127,12 +151,18 @@ export default function ChildProfile() {
           <div className="w-full bg-muted rounded-full h-4">
             <div
               className={`h-4 rounded-full transition-all ${
-                student.attendance >= 75 ? "bg-success" : student.attendance >= 60 ? "bg-warning" : "bg-danger"
+                student.attendance >= 75
+                  ? "bg-success"
+                  : student.attendance >= 60
+                  ? "bg-warning"
+                  : "bg-danger"
               }`}
               style={{ width: `${student.attendance}%` }}
             />
           </div>
-          <p className="text-sm text-muted-foreground mt-2">{student.attendance}% overall attendance</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            {student.attendance}% overall attendance
+          </p>
           {student.attendance < 75 && (
             <p className="text-sm text-danger mt-2 font-medium">
               ⚠ Attendance below required 75%. Please contact the mentor.
@@ -149,34 +179,50 @@ export default function ChildProfile() {
                 <XAxis dataKey="date" fontSize={12} stroke="hsl(var(--muted-foreground))" />
                 <YAxis domain={[1, 5]} fontSize={12} stroke="hsl(var(--muted-foreground))" />
                 <Tooltip />
-                <Line type="monotone" dataKey="score" stroke="hsl(var(--secondary))" strokeWidth={2} />
+                <Line
+                  type="monotone"
+                  dataKey="score"
+                  stroke="hsl(var(--secondary))"
+                  strokeWidth={2}
+                />
               </LineChart>
             </ResponsiveContainer>
-          ) : <p className="text-sm text-muted-foreground">No check-in data yet</p>}
+          ) : (
+            <p className="text-sm text-muted-foreground">No check-in data yet</p>
+          )}
           <p className="text-sm text-muted-foreground mt-2">Current mood: {student.mood}</p>
         </TabsContent>
 
         <TabsContent value="documents" className="rounded-xl border bg-card p-6 mt-4">
           <h3 className="font-semibold mb-4">Documents</h3>
           <div className="space-y-3">
-            {(documents || []).map((doc: any) => (
-              <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
+            {(documents ?? []).map((doc: Document) => (
+              <div
+                key={doc.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-muted/50"
+              >
                 <div className="flex items-center gap-3">
                   <span>{doc.title}</span>
-                  <DocBadge status={doc.status} />
+                  <DocBadge status={doc.status as DocumentStatus} />
                 </div>
-                <Button size="sm" variant="outline" onClick={() => window.open(doc.file_url, "_blank")}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => window.open(doc.file_url, "_blank")}
+                >
                   <ExternalLink className="h-3 w-3 mr-1" /> View
                 </Button>
               </div>
             ))}
-            {(!documents || documents.length === 0) && <p className="text-sm text-muted-foreground">No documents uploaded</p>}
+            {(!documents || documents.length === 0) && (
+              <p className="text-sm text-muted-foreground">No documents uploaded</p>
+            )}
           </div>
         </TabsContent>
 
         <TabsContent value="leave" className="rounded-xl border bg-card p-6 mt-4">
           <h3 className="font-semibold mb-4">Leave History</h3>
-          {leaveRecords?.length > 0 ? (
+          {(leaveRecords ?? []).length > 0 ? (
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
@@ -186,16 +232,22 @@ export default function ChildProfile() {
                 </tr>
               </thead>
               <tbody>
-                {leaveRecords.map((l: any) => (
+                {leaveRecords.map((l: LeaveRecord) => (
                   <tr key={l.id} className="border-b last:border-0">
-                    <td className="py-2">{l.from_date} to {l.to_date}</td>
+                    <td className="py-2">
+                      {l.from_date} to {l.to_date}
+                    </td>
                     <td className="py-2">{l.reason}</td>
-                    <td className="py-2"><LeaveBadge status={l.status} /></td>
+                    <td className="py-2">
+                      <LeaveBadge status={l.status} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
-          ) : <p className="text-sm text-muted-foreground">No leave records</p>}
+          ) : (
+            <p className="text-sm text-muted-foreground">No leave records</p>
+          )}
         </TabsContent>
 
         <TabsContent value="health" className="rounded-xl border bg-card p-6 mt-4">
@@ -203,15 +255,19 @@ export default function ChildProfile() {
           <div className="grid grid-cols-2 gap-3">
             <div className="p-3 rounded-lg bg-muted/50">
               <span className="text-xs text-muted-foreground block">Blood Group</span>
-              <span className="font-medium">{healthInfo?.blood_group || student.blood_group || "N/A"}</span>
+              <span className="font-medium">
+                {healthInfo?.blood_group ?? student.blood_group ?? "N/A"}
+              </span>
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
               <span className="text-xs text-muted-foreground block">Conditions</span>
-              <span className="font-medium">{healthInfo?.chronic_conditions || student.chronic_conditions || "None"}</span>
+              <span className="font-medium">
+                {healthInfo?.chronic_conditions ?? student.chronic_conditions ?? "None"}
+              </span>
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
               <span className="text-xs text-muted-foreground block">Emergency Contact</span>
-              <span className="font-medium">{student.emergency_contact || "N/A"}</span>
+              <span className="font-medium">{student.emergency_contact ?? "N/A"}</span>
             </div>
             <div className="p-3 rounded-lg bg-muted/50">
               <span className="text-xs text-muted-foreground block">Hostel Status</span>

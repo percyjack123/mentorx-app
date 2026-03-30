@@ -9,6 +9,8 @@ const adminRoutes = require('./routes/admin');
 const mentorRoutes = require('./routes/mentor');
 const menteeRoutes = require('./routes/mentee');
 const parentRoutes = require('./routes/parent');
+const feedbackRoutes = require('./routes/feedback');
+const documentRoutes = require('./routes/documents');
 
 const app = express();
 
@@ -32,6 +34,8 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/mentor', mentorRoutes);
 app.use('/api/mentee', menteeRoutes);
 app.use('/api/parent', parentRoutes);
+app.use('/api/feedback', feedbackRoutes);
+app.use('/api/documents', documentRoutes);
 
 // ── ML route ───────────────────────────────────────────────
 const ML_SERVICE_URL = process.env.ML_SERVICE_URL || 'http://localhost:8000';

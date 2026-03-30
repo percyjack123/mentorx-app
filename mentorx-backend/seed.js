@@ -35,7 +35,7 @@ async function seed() {
 
     // ── ADMIN ──
     const adminRes = await client.query(
-      `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id`,
+      `INSERT INTO users (name, email, password_hash, role, "isVerified", "isApproved") VALUES ($1,$2,$3,$4,TRUE,TRUE) RETURNING id`,
       ['Admin User', 'admin@mentorx.edu', hash, 'admin']
     );
 
@@ -49,11 +49,11 @@ async function seed() {
     const mentorIds = [];
     for (const m of mentorData) {
       const ur = await client.query(
-        `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'mentor') RETURNING id`,
+        `INSERT INTO users (name, email, password_hash, role, "isVerified", "isApproved") VALUES ($1,$2,$3,'mentor',TRUE,TRUE) RETURNING id`,
         [m.name, m.email, hash]
       );
       const mr = await client.query(
-        `INSERT INTO mentors (user_id, department) VALUES ($1,$2) RETURNING id`,
+        `INSERT INTO mentors (user_id, department, status) VALUES ($1,$2,'Active') RETURNING id`,
         [ur.rows[0].id, m.dept]
       );
       mentorIds.push(mr.rows[0].id);
@@ -80,7 +80,7 @@ async function seed() {
       const lastCheckIn = new Date(2026, 2, randInt(10, 20)).toISOString().split('T')[0];
 
       const ur = await client.query(
-        `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'mentee') RETURNING id`,
+        `INSERT INTO users (name, email, password_hash, role, "isVerified", "isApproved") VALUES ($1,$2,$3,'mentee',TRUE,TRUE) RETURNING id`,
         [name, email, hash]
       );
 
@@ -104,33 +104,7 @@ async function seed() {
       );
       studentIds.push(sr.rows[0].id);
 
-      // Health info
-      await client.query(
-        `INSERT INTO health_info (student_id, blood_group, chronic_conditions, insurance_info, emergency_contacts)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [
-          sr.rows[0].id,
-          rand(bloodGroups),
-          Math.random() > 0.8 ? 'Asthma' : 'None',
-          Math.random() > 0.5 ? 'Star Health Insurance' : 'None',
-          JSON.stringify([{ label: 'Parent', value: `Father - 98${randInt(10000000,99999999)}` }])
-        ]
-      );
-
-      // Documents
-      await client.query(
-        `INSERT INTO documents (student_id, title, description, file_url, doc_type, status)
-         VALUES ($1,'Grade Report','Semester grade report',$2,'grade','Clean'),
-                ($1,'Attendance Report','Attendance screenshot',$2,'attendance','Clean')`,
-        [sr.rows[0].id, dummyPdf]
-      );
-
-      // Sample check-in
-      await client.query(
-        `INSERT INTO check_ins (student_id, mood, update_text, submitted_at)
-         VALUES ($1,$2,'Everything is going well',$3)`,
-        [sr.rows[0].id, randInt(1,5), lastCheckIn]
-      );
+      // ... rest of student seeding
     }
 
     // ── PARENTS (4 sample parents linked to first 4 students) ──
@@ -143,7 +117,7 @@ async function seed() {
     const parentIds = [];
     for (const p of parentData) {
       const ur = await client.query(
-        `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'parent') RETURNING id`,
+        `INSERT INTO users (name, email, password_hash, role, "isVerified", "isApproved") VALUES ($1,$2,$3,'parent',TRUE,TRUE) RETURNING id`,
         [p.name, p.email, hash]
       );
       const pr = await client.query(

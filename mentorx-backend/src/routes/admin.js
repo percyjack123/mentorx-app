@@ -78,6 +78,9 @@ router.put('/mentors/:id/approve', adminOnly, async (req, res) => {
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Mentor not found' });
+
+    // Mark email as verified for mentor login (admin approval completes verification in this system)
+    await db.query(`UPDATE users SET "isVerified" = TRUE WHERE id = $1`, [rows[0].user_id]);
     await createNotification(rows[0].user_id, 'system',
       'Your mentor registration has been approved. You can now log in.');
     res.json(rows[0]);
@@ -95,6 +98,8 @@ router.put('/mentors/:id/reject', adminOnly, async (req, res) => {
       [req.params.id]
     );
     if (!rows.length) return res.status(404).json({ error: 'Mentor not found' });
+
+    await db.query(`UPDATE users SET "isVerified" = FALSE WHERE id = $1`, [rows[0].user_id]);
     await createNotification(rows[0].user_id, 'system',
       'Your mentor registration was not approved.');
     res.json(rows[0]);
@@ -208,17 +213,34 @@ router.post('/users', adminOnly, async (req, res) => {
   const { name, email, password, role } = req.body;
   if (!name || !email || !password || !role)
     return res.status(400).json({ error: 'Missing fields' });
+  const client = await db.pool.connect();
   try {
+    await client.query('BEGIN');
     const hash = await bcrypt.hash(password, 10);
-    const user = await db.query(
-      `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,$4) RETURNING id`,
+    const userRes = await client.query(
+      `INSERT INTO users (name, email, password_hash, role, "isVerified", "isApproved") 
+       VALUES ($1,$2,$3,$4, TRUE, TRUE) RETURNING id`,
       [name, email, hash, role]
     );
-    res.status(201).json({ userId: user.rows[0].id });
+    const userId = userRes.rows[0].id;
+
+    if (role === 'mentee') {
+      await client.query(`INSERT INTO students (user_id) VALUES ($1)`, [userId]);
+    } else if (role === 'mentor') {
+      await client.query(`INSERT INTO mentors (user_id, status) VALUES ($1, 'Active')`, [userId]);
+    } else if (role === 'parent') {
+      await client.query(`INSERT INTO parents (user_id) VALUES ($1)`, [userId]);
+    }
+
+    await client.query('COMMIT');
+    res.status(201).json({ userId });
   } catch (err) {
+    await client.query('ROLLBACK');
     if (err.code === '23505') return res.status(400).json({ error: 'Email exists' });
     console.error('POST /admin/users:', err);
     res.status(500).json({ error: 'Server error', detail: err.message });
+  } finally {
+    client.release();
   }
 });
 
@@ -237,7 +259,7 @@ router.post('/mentors', adminOnly, async (req, res) => {
     }
     const hash = await bcrypt.hash(password, 10);
     const userRes = await client.query(
-      `INSERT INTO users (name, email, password_hash, role) VALUES ($1,$2,$3,'mentor') RETURNING id`,
+      `INSERT INTO users (name, email, password_hash, role, "isVerified", "isApproved") VALUES ($1,$2,$3,'mentor', TRUE, TRUE) RETURNING id`,
       [name, email, hash]
     );
     const userId = userRes.rows[0].id;

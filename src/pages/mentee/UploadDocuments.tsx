@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,6 +8,7 @@ import { Upload, FileText, ExternalLink, Trash2, Plus, Loader2 } from "lucide-re
 import { toast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { menteeApi } from "@/lib/api";
+import { TrendingUp } from "lucide-react";
 
 const REQUIRED_DOCS = [
   { title: "Grade Report PDF", docType: "grade" },
@@ -130,13 +131,34 @@ export default function UploadDocuments() {
                   <Button size="sm" variant="outline" onClick={() => window.open(doc.uploaded.file_url, "_blank")}>
                     <ExternalLink className="h-3 w-3" />
                   </Button>
+                  <Button size="sm" variant="ghost" onClick={() => handleDelete(doc.uploaded.id)} className="text-danger hover:text-danger p-2 h-8 w-8">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </Button>
                 </div>
               )}
             </div>
             {doc.uploaded && (
-              <div className="mt-4 p-3 rounded-lg bg-muted">
-                <p className="text-xs font-medium text-muted-foreground mb-1">OCR Extracted Data (Placeholder)</p>
-                <p className="text-sm">Document text content would appear here after OCR processing...</p>
+              <div className="mt-4 p-3 rounded-lg bg-muted border border-primary/10">
+                <p className="text-xs font-medium text-muted-foreground mb-2 flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3" /> OCR Extracted Data
+                </p>
+                <div className="flex gap-4">
+                  {doc.uploaded.extracted_cgpa != null && (
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">CGPA</p>
+                      <p className="text-sm font-bold text-primary">{doc.uploaded.extracted_cgpa}</p>
+                    </div>
+                  )}
+                  {doc.uploaded.extracted_attendance != null && (
+                    <div>
+                      <p className="text-[10px] uppercase text-muted-foreground">Attendance</p>
+                      <p className="text-sm font-bold text-primary">{doc.uploaded.extracted_attendance}%</p>
+                    </div>
+                  )}
+                  {doc.uploaded.extracted_cgpa == null && doc.uploaded.extracted_attendance == null && (
+                    <p className="text-xs italic text-muted-foreground">No numeric data extracted from this document.</p>
+                  )}
+                </div>
               </div>
             )}
           </div>
