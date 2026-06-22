@@ -1,143 +1,184 @@
-# MentorX Backend — Setup Guide
+````markdown
+# MentorX – AI-Powered Student Mentorship Platform
 
-## Project Structure
+## Overview
+
+MentorX is a full-stack mentorship and student wellness platform designed to help educational institutions connect students with mentors, track progress, monitor well-being, and provide timely intervention when students require support.
+
+The platform enables administrators, mentors, and students to collaborate through a centralized system featuring mentorship management, goal tracking, analytics, health monitoring, resource sharing, and SOS escalation workflows.
+
+---
+
+## Problem Statement
+
+Educational institutions often struggle to provide personalized mentorship at scale. Student concerns, academic challenges, mental health issues, and career guidance requests are frequently scattered across multiple systems.
+
+MentorX addresses this challenge by providing a unified platform that:
+
+- Connects students with assigned mentors
+- Tracks student progress and goals
+- Monitors wellness through daily check-ins
+- Provides analytics and risk alerts
+- Enables resource sharing and collaboration
+- Facilitates rapid escalation through SOS workflows
+
+---
+
+## Key Features
+
+### Student (Mentee) Portal
+
+- Daily wellness check-ins
+- Goal and task tracking
+- Leave application management
+- Skill development logs
+- Document management
+- Resource access
+- Concern reporting
+- Health information management
+- Emergency SOS support
+- Feedback submission
+
+### Mentor Dashboard
+
+- Assigned mentee management
+- Student performance monitoring
+- High-risk student alerts
+- Meeting scheduling
+- Goal assignment and tracking
+- Resource publishing
+- Discussion forums
+- Leave approval workflow
+- Analytics dashboard
+- Concern management
+
+### Admin Dashboard
+
+- User management
+- Mentor assignment system
+- Student allocation
+- Institutional analytics
+- Feedback monitoring
+- Platform administration
+
+---
+
+## System Architecture
+
+```text
+Frontend (React + TypeScript)
+            │
+            ▼
+REST API Layer (Node.js + Express)
+            │
+            ▼
+Authentication Layer (JWT)
+            │
+            ▼
+PostgreSQL Database (Supabase)
+````
+
+---
+
+## Tech Stack
+
+### Frontend
+
+* React
+* TypeScript
+* Vite
+
+### Backend
+
+* Node.js
+* Express.js
+* JWT Authentication
+
+### Database
+
+* PostgreSQL
+* Supabase
+
+### Additional Tools
+
+* REST APIs
+* Role-Based Access Control (RBAC)
+
+---
+
+## Database Design
+
+The system supports:
+
+* Students
+* Mentors
+* Administrators
+* Goals & Tasks
+* Leave Requests
+* Resources
+* Forums
+* Feedback
+* Notifications
+* SOS Events
+* Health Records
+
+---
+
+## API Highlights
+
+### Authentication
+
+* Secure JWT login
+* Protected routes
+* Role-based authorization
+
+### Admin Services
+
+* User lifecycle management
+* Mentor assignment workflows
+* Analytics and reporting
+
+### Mentor Services
+
+* Student monitoring
+* Goal management
+* Resource publishing
+* Forum participation
+
+### Student Services
+
+* Wellness tracking
+* Skill logging
+* Leave applications
+* Feedback submission
+
+---
+
+## Future Enhancements
+
+* AI-powered mentor recommendation engine
+* Sentiment analysis for student wellness
+* Attendance prediction models
+* Career pathway recommendations
+* Real-time chat and video mentoring
+* Mobile application support
+
+---
+
+## Contributors
+
+* Sahithi Jalaparti
+* Saumya
+* Snigdha
+* Supriya
+* Aryan
+* Keshav
+
+---
+
+## License
+
+MIT License
+
 ```
-mentorx-backend/
-├── src/
-│   ├── index.js              # Express app entry point
-│   ├── db/index.js           # PostgreSQL (Supabase) connection
-│   ├── middleware/auth.js    # JWT auth middleware
-│   └── routes/
-│       ├── auth.js           # Login, /me
-│       ├── admin.js          # Admin-only routes
-│       ├── mentor.js         # Mentor routes
-│       └── mentee.js         # Mentee (student) routes
-├── schema.sql                # Run in Supabase SQL Editor
-├── seed.js                   # Seed 40 students + 4 mentors + admin
-├── api.ts                    # Copy to frontend: src/lib/api.ts
-├── .env.example
-└── package.json
 ```
-
----
-
-## Step 1 — Supabase Setup
-
-1. Go to [https://supabase.com](https://supabase.com) → New Project
-2. In the **SQL Editor**, paste the contents of `schema.sql` and run it
-3. Get your connection string from:
-   **Project Settings → Database → Connection string → URI**
-   It looks like: `postgresql://postgres:[PASSWORD]@db.[REF].supabase.co:5432/postgres`
-
----
-
-## Step 2 — Backend Setup
-
-```bash
-cd mentorx-backend
-npm install
-
-# Create your .env file
-cp .env.example .env
-# Edit .env and paste your Supabase connection string as DATABASE_URL
-# Also set a strong JWT_SECRET
-
-# Seed the database
-node seed.js
-
-# Start the server
-npm run dev       # development (with nodemon)
-npm start         # production
-```
-
----
-
-## Step 3 — Frontend Setup
-
-1. Copy `api.ts` to your frontend at `src/lib/api.ts`
-2. Create `src/.env` (or `.env.local`) in your Vite frontend:
-   ```
-   VITE_API_URL=http://localhost:3001/api
-   ```
-3. Update your Login page to use the real API:
-   ```tsx
-   import { authApi } from "@/lib/api";
-
-   const handleLogin = async (e) => {
-     e.preventDefault();
-     const { user } = await authApi.login(email, password);
-     if (user.role === 'admin') navigate('/admin');
-     else if (user.role === 'mentor') navigate('/mentor');
-     else navigate('/mentee');
-   };
-   ```
-
----
-
-## Test Credentials
-All accounts use password: `password123`
-
-| Role   | Email                          |
-|--------|-------------------------------|
-| Admin  | admin@mentorx.edu             |
-| Mentor | suresh.menon@mentorx.edu      |
-| Mentee | student1@mentorx.edu          |
-
----
-
-## API Endpoints Summary
-
-### Auth
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | /api/auth/login | Login (returns JWT) |
-| GET | /api/auth/me | Get current user |
-
-### Admin
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /api/admin/dashboard | Dashboard stats |
-| GET | /api/admin/mentors | All mentors |
-| GET | /api/admin/mentors/:id/students | Mentor's students |
-| GET | /api/admin/students | All students |
-| POST | /api/admin/users | Create user |
-| DELETE | /api/admin/users/:id | Delete user |
-| PUT | /api/admin/students/:id/assign-mentor | Assign mentor |
-| GET | /api/admin/analytics | Analytics |
-| GET | /api/admin/feedback | All feedback |
-
-### Mentor
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /api/mentor/dashboard | Dashboard stats |
-| GET | /api/mentor/mentees | List mentees |
-| GET | /api/mentor/mentees/:id | Full mentee profile |
-| GET | /api/mentor/alerts | High-risk / tampered / SOS alerts |
-| GET/POST | /api/mentor/meetings | Meetings |
-| GET/POST | /api/mentor/resources | Resources |
-| GET/POST | /api/mentor/forum | Forum threads |
-| POST | /api/mentor/forum/:id/reply | Reply to thread |
-| GET | /api/mentor/analytics | Analytics for mentees |
-| PUT | /api/mentor/leaves/:id | Approve/Reject leave |
-| POST | /api/mentor/mentees/:id/goals | Set goal for student |
-| GET | /api/mentor/concerns | View concerns |
-
-### Mentee
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | /api/mentee/dashboard | Dashboard |
-| GET | /api/mentee/profile | Student profile |
-| POST | /api/mentee/checkin | Submit daily check-in |
-| GET | /api/mentee/checkin/today | Check today's status |
-| GET/POST | /api/mentee/leave | Leave history & apply |
-| GET | /api/mentee/goals | Goals list |
-| PUT | /api/mentee/goals/:goalId/tasks/:taskId | Toggle task |
-| GET/POST | /api/mentee/skills | Skill log |
-| GET | /api/mentee/resources | View resources |
-| POST | /api/mentee/concern | Raise concern |
-| GET/PUT | /api/mentee/health | Health info |
-| POST | /api/mentee/sos | Trigger SOS |
-| GET/POST/DELETE | /api/mentee/documents | Documents |
-| POST | /api/mentee/feedback | Submit feedback |
-| GET | /api/mentee/notifications | Notifications |
-| PUT | /api/mentee/notifications/:id/read | Mark read |
